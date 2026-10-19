@@ -268,7 +268,96 @@ def gerar_horarios(dados):
             modelo.add(excesso >= sum(vars_dia) - 1)
             penalidades.append(excesso)
 
-    modelo.minimize(sum(penalidades))
+    
+    # OTIMIZAÇÃO: REDUZIR JANELAS DOS PROFESSORES
+
+    penalidades_janelas = []
+
+    for professor in professores:
+        professor_id = professor["id"]
+
+        for dia in DIAS:
+            # Regular e contraturno são considerados
+            # períodos separados.
+            for periodo in ("regular", "contraturno"):
+
+                slots = [
+                    p for p in posicoes
+                    if p.split(":")[0] == dia
+                    and p.split(":")[1] == periodo
+                ]
+
+                if len(slots) < 3:
+                    continue
+
+                ocupados = []
+
+                for posicao in slots:
+                    ocupado = modelo.new_bool_var(
+                        f"ocupado_{professor_id}_{posicao}"
+                    )
+
+                    modelo.add(
+                        sum(variaveis(
+                            professor=professor_id,
+                            posicao=posicao
+                        )) == ocupado
+                    )
+
+                    ocupados.append(ocupado)
+
+                # Uma janela é uma posição vazia
+                # com pelo menos uma aula antes e outra depois.
+                for indice in range(1, len(slots) - 1):
+
+                    anterior = modelo.new_bool_var(
+                        f"antes_{professor_id}_{dia}_"
+                        f"{periodo}_{indice}"
+                    )
+
+                    posterior = modelo.new_bool_var(
+                        f"depois_{professor_id}_{dia}_"
+                        f"{periodo}_{indice}"
+                    )
+
+                    janela = modelo.new_bool_var(
+                        f"janela_{professor_id}_{dia}_"
+                        f"{periodo}_{indice}"
+                    )
+
+                    modelo.add_max_equality(
+                        anterior,
+                        ocupados[:indice]
+                    )
+
+                    modelo.add_max_equality(
+                        posterior,
+                        ocupados[indice + 1:]
+                    )
+
+                    # Janela = anterior E posterior
+                    #          E NÃO ocupado.
+                    modelo.add(janela <= anterior)
+                    modelo.add(janela <= posterior)
+                    modelo.add(janela + ocupados[indice] <= 1)
+
+                    modelo.add(
+                        janela >= anterior + posterior
+                        - ocupados[indice] - 1
+                    )
+
+                    penalidades_janelas.append(janela)
+
+    # Janelas têm prioridade sobre a preferência
+    # anterior de distribuir disciplinas.
+    PESO_JANELAS = 100
+    PESO_DISTRIBUICAO = 1
+
+    modelo.minimize(
+        PESO_JANELAS * sum(penalidades_janelas)
+        + PESO_DISTRIBUICAO * sum(penalidades)
+    )
+
 
     resolvedor = cp_model.CpSolver()
     resolvedor.parameters.max_time_in_seconds = 25.0
