@@ -563,3 +563,194 @@ form select {
     grid-template-columns: 1fr;
   }
 }
+
+/* GRADE HORÁRIA */
+
+#grade-escolar {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-top: 22px;
+}
+
+.bloco-horario {
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+}
+
+.bloco-horario h3 {
+  margin: 0;
+  padding: 18px;
+  color: white;
+  background: #1e3a8a;
+}
+
+.tabela-horarios {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 770px;
+  table-layout: fixed;
+}
+
+.tabela-horarios th,
+.tabela-horarios td {
+  border: 1px solid #e2e8f0;
+  padding: 7px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.tabela-horarios th {
+  background: #eff6ff;
+  font-size: 13px;
+}
+
+.tabela-horarios th:first-child {
+  width: 85px;
+}
+
+.celula-aula {
+  height: 78px;
+  cursor: pointer;
+  background: #fff;
+  transition: background 0.15s;
+}
+
+.celula-aula:hover {
+  background: #eff6ff;
+}
+
+.celula-aula.selecionada {
+  outline: 3px solid #2563eb;
+  outline-offset: -3px;
+  background: #dbeafe;
+}
+
+.celula-aula.preenchida {
+  background: #f0fdf4;
+}
+
+.celula-aula.invalida {
+  background: #fee2e2;
+  border: 2px solid #dc2626;
+}
+
+.celula-aula strong {
+  display: block;
+  font-size: 13px;
+}
+
+.celula-aula small {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 6px;
+}
+
+.celula-aula.vazia {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.celula-aula.sem-posicao {
+  background: #f1f5f9;
+  cursor: default;
+}
+
+.titulo-contraturno {
+  margin: 16px 0 0;
+  padding: 12px;
+  background: #fef3c7;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.editor-horario {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 18px;
+  background: #eff6ff;
+  border-radius: 12px;
+  margin: 18px 0;
+}
+
+.editor-horario label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.editor-horario select {
+  min-width: 260px;
+  max-width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.resumo-horarios {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.resumo-horarios span {
+  padding: 12px 16px;
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+#mensagem-grade {
+  font-weight: 600;
+}
+
+#mensagem-grade.erro {
+  color: #b91c1c;
+}
+
+#mensagem-grade.sucesso {
+  color: #15803d;
+}
+
+@media print {
+  .sidebar,
+  .topbar,
+  .cabecalho-modulo .acoes-form,
+  .editor-horario,
+  #mensagem-grade,
+  #resumo-grade,
+  .aviso {
+    display: none !important;
+  }
+
+  .conteudo {
+    padding: 0;
+  }
+
+  .pagina {
+    display: none !important;
+  }
+
+  #horarios {
+    display: block !important;
+  }
+
+  .bloco-horario {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 18px;
+  }
+
+  .tabela-horarios {
+    min-width: 0;
+  }
+
+  .celula-aula {
+    height: 58px;
+  }
+}

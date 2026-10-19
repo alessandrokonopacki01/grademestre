@@ -9,6 +9,7 @@
     <script src="js/app.js" defer></script>
     <script src="js/professores.js" defer></script>
     <script src="js/turmas.js" defer></script>
+    <script src="js/horarios.js" defer></script>
 </head>
 
 <body>
@@ -180,12 +181,46 @@
 </section>
 
 
-            <section id="horarios" class="pagina">
-                <div class="painel-info">
-                    <h2>Grade horária</h2>
-                    <p>A geração automática estará disponível após implementarmos os cadastros e o algoritmo.</p>
-                </div>
-            </section>
+           
+<section id="horarios" class="pagina">
+  <div class="painel-info">
+    <div class="cabecalho-modulo">
+      <div>
+        <h2>Grade horária</h2>
+        <p>
+          Distribua as aulas, confira os conflitos
+          e imprima os horários.
+        </p>
+      </div>
+
+      <div class="acoes-form">
+        <button id="atualizar-grade" class="btn-secundario">
+          Atualizar grade
+        </button>
+
+        <button id="imprimir-grade" class="btn-secundario">
+          Imprimir
+        </button>
+
+        <button id="limpar-grade" class="btn-remover">
+          Limpar horários
+        </button>
+      </div>
+    </div>
+
+    <div id="resumo-grade"></div>
+
+    <p id="mensagem-grade" role="status"></p>
+
+    <div id="grade-escolar"></div>
+
+    <p class="aviso">
+      A geração automática será integrada
+      na próxima etapa.
+    </p>
+  </div>
+</section>
+
 
             <section id="configuracoes" class="pagina">
                 <div class="painel-info">
