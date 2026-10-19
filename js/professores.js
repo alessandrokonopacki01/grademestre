@@ -202,6 +202,86 @@ function adicionarVinculo(dados = {}) {
     )
   );
 
+  // CONFIGURAÇÃO DE AULAS GEMINADAS
+
+  const configuracaoGeminadas = document.createElement("div");
+
+  const labelGeminadas = document.createElement("label");
+  labelGeminadas.textContent = "Aulas geminadas";
+
+  const selectGeminadas = document.createElement("select");
+  selectGeminadas.className = "vinculo-geminadas";
+
+  [
+    ["obrigatoria", "Obrigatória"],
+    ["livre", "Livre"]
+  ].forEach(([valor, titulo]) => {
+    const option = document.createElement("option");
+    option.value = valor;
+    option.textContent = titulo;
+    selectGeminadas.appendChild(option);
+  });
+
+  const cargaInicial = Number(dados.aulas ?? 2);
+
+  // Nos novos cadastros, a exigência é obrigatória
+  // por padrão para disciplinas com 2 ou mais aulas.
+  const modoInicial = dados.geminadas ||
+    (cargaInicial >= 2 ? "obrigatoria" : "livre");
+
+  selectGeminadas.value = modoInicial;
+
+  configuracaoGeminadas.append(
+    labelGeminadas,
+    selectGeminadas
+  );
+
+  linha.appendChild(configuracaoGeminadas);
+
+  const grupoPares = criarCampo(
+    "Pares por semana",
+    "number",
+    "vinculo-pares",
+    dados.paresGeminados ??
+      (modoInicial === "obrigatoria" ? 1 : 0),
+    0,
+    Math.floor(cargaInicial / 2)
+  );
+
+  linha.appendChild(grupoPares);
+
+  const campoAulas = linha.querySelector(".vinculo-aulas");
+  const campoPares = grupoPares.querySelector("input");
+
+  function atualizarGeminadas() {
+    const aulas = Number(campoAulas.value) || 0;
+    const maxPares = Math.floor(aulas / 2);
+    const obrigatoria = selectGeminadas.value === "obrigatoria";
+
+    campoPares.max = maxPares;
+    campoPares.disabled = !obrigatoria;
+
+    if (!obrigatoria) {
+      campoPares.value = 0;
+    } else if (Number(campoPares.value) === 0 && maxPares > 0) {
+      campoPares.value = 1;
+    }
+
+    if (Number(campoPares.value) > maxPares) {
+      campoPares.value = maxPares;
+    }
+  }
+
+  selectGeminadas.addEventListener(
+    "change", atualizarGeminadas
+  );
+
+  campoAulas.addEventListener(
+    "change", atualizarGeminadas
+  );
+
+  atualizarGeminadas();
+
   const remover = document.createElement("button");
   remover.type = "button";
   remover.className = "btn-remover";
@@ -252,13 +332,24 @@ function fecharEditorProfessor() {
   $p("editor-professor").hidden = true;
 }
 
+
 function coletarVinculos() {
-  return [...document.querySelectorAll(".vinculo")].map(linha => ({
-    turma: linha.querySelector(".vinculo-turma").value.trim(),
-    disciplina: linha.querySelector(".vinculo-disciplina").value.trim(),
-    aulas: Number(linha.querySelector(".vinculo-aulas").value),
-    maxDia: Number(linha.querySelector(".vinculo-max").value)
-  }));
+  return [...document.querySelectorAll(".vinculo")].map(linha => {
+    const geminadas = linha.querySelector(
+      ".vinculo-geminadas"
+    ).value;
+
+    return {
+      turma: linha.querySelector(".vinculo-turma").value.trim(),
+      disciplina: linha.querySelector(".vinculo-disciplina").value.trim(),
+      aulas: Number(linha.querySelector(".vinculo-aulas").value),
+      maxDia: Number(linha.querySelector(".vinculo-max").value),
+      geminadas,
+      paresGeminados: geminadas === "obrigatoria"
+        ? Number(linha.querySelector(".vinculo-pares").value)
+        : 0
+    };
+  });
 }
 
 function validarVinculos(vinculos, maxDia) {
@@ -281,6 +372,28 @@ function validarVinculos(vinculos, maxDia) {
     if (!Number.isInteger(v.maxDia) ||
         v.maxDia < 1 || v.maxDia > maxDia) {
       return "Revise o limite diário de cada disciplina.";
+    }
+
+    if (!["livre", "obrigatoria"].includes(v.geminadas)) {
+      return "Configuração de aulas geminadas inválida.";
+    }
+
+    if (!Number.isInteger(v.paresGeminados) ||
+        v.paresGeminados < 0 ||
+        2 * v.paresGeminados > v.aulas) {
+      return "A quantidade de pares geminados é incompatível " +
+        "com as aulas semanais.";
+    }
+
+    if (v.geminadas === "obrigatoria" &&
+        v.paresGeminados < 1) {
+      return "Informe pelo menos um par obrigatório ou " +
+        "selecione a modalidade Livre.";
+    }
+
+    if (v.geminadas === "obrigatoria" && v.maxDia < 2) {
+      return "Aulas geminadas obrigatórias exigem " +
+        "um limite diário de pelo menos 2 aulas.";
     }
 
     const chave = `${v.turma.toLowerCase()}|${v.disciplina.toLowerCase()}`;
@@ -373,15 +486,22 @@ function renderizarProfessores() {
       )
     );
 
-    professor.vinculos.forEach(v => {
-      card.appendChild(
-        textoElemento(
-          "p",
-          `${v.turma} — ${v.disciplina}: ${v.aulas} aulas/semana ` +
-          `(máx. ${v.maxDia}/dia)`
-        )
-      );
-    });
+    
+professor.vinculos.forEach(v => {
+  const detalheGeminadas = v.geminadas === "obrigatoria"
+    ? ` • ${v.paresGeminados} par(es) obrigatório(s)`
+    : " • Aulas livres";
+
+  card.appendChild(
+    textoElemento(
+      "p",
+      `${v.turma} — ${v.disciplina}: ${v.aulas} aulas/semana ` +
+      `(máx. ${v.maxDia}/dia)` +
+      detalheGeminadas
+    )
+  );
+});
+
 
     card.appendChild(
       textoElemento(

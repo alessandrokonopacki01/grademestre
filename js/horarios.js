@@ -236,6 +236,68 @@ function validarGrade(dados, verificarCompletude = false) {
     return "Cadastre pelo menos uma turma.";
   }
 
+  // VALIDAÇÃO DAS AULAS GEMINADAS NA GRADE COMPLETA
+
+  if (verificarCompletude) {
+    for (const professor of professores) {
+      for (const vinculo of professor.vinculos) {
+        if (vinculo.geminadas !== "obrigatoria") {
+          continue;
+        }
+
+        const exigidos = Number(vinculo.paresGeminados || 0);
+        if (exigidos === 0) continue;
+
+        const turma = turmas.find(t =>
+          nomeNormalizado(t.nome) ===
+          nomeNormalizado(vinculo.turma)
+        );
+
+        if (!turma) {
+          return `Turma não encontrada: ${vinculo.turma}.`;
+        }
+
+        let paresEncontrados = 0;
+
+        for (const dia of DIAS_GRADE) {
+          for (const periodo of ["regular", "contraturno"]) {
+            const slots = posicoesGrade().filter(pos =>
+              pos.startsWith(`${dia.id}:${periodo}:`)
+            );
+
+            let consecutivas = 0;
+
+            for (const posicao of slots) {
+              const atribuicao = dados[
+                chaveCelula(turma.id, posicao)
+              ];
+
+              const corresponde = atribuicao &&
+                atribuicao.professorId === professor.id &&
+                nomeNormalizado(atribuicao.disciplina) ===
+                nomeNormalizado(vinculo.disciplina);
+
+              if (corresponde) {
+                consecutivas++;
+              } else {
+                paresEncontrados += Math.floor(consecutivas / 2);
+                consecutivas = 0;
+              }
+            }
+
+            paresEncontrados += Math.floor(consecutivas / 2);
+          }
+        }
+
+        if (paresEncontrados < exigidos) {
+          return `${vinculo.disciplina} na turma ${turma.nome} ` +
+            `precisa de ${exigidos} par(es) geminado(s), ` +
+            `mas possui apenas ${paresEncontrados}.`;
+        }
+      }
+    }
+  }
+
   return null;
 }
 

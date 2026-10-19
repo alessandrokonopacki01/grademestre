@@ -108,13 +108,41 @@ def gerar_horarios(dados):
 
             chaves_vinculos.add(chave)
 
+          
+            geminadas = vinculo.get("geminadas", "livre")
+
+            pares = int(vinculo.get("paresGeminados", 0))
+
+            if geminadas not in ("livre", "obrigatoria"):
+                raise ValueError(
+                    f"Configuração geminada inválida em {disciplina}."
+                )
+
+            if geminadas == "livre":
+                pares = 0
+
+            if pares < 0 or 2 * pares > aulas:
+                raise ValueError(
+                    f"Quantidade de pares inválida em {disciplina}."
+                )
+
+            if geminadas == "obrigatoria":
+                if pares < 1 or limite < 2 or max_dia < 2:
+                    raise ValueError(
+                        f"Revise os pares e os limites diários "
+                        f"de {disciplina}."
+                    )
+
             vinculos.append({
                 "professorId": professor_id,
                 "turmaId": turma_id,
                 "disciplina": disciplina,
                 "aulas": aulas,
-                "maxDia": limite
+                "maxDia": limite,
+                "geminadas": geminadas,
+                "paresGeminados": pares
             })
+
 
             carga_turmas[turma_id] += aulas
 
@@ -219,6 +247,76 @@ def gerar_horarios(dados):
                 sum(variaveis(i=i, dia=dia)) <=
                 vinculo["maxDia"]
             )
+
+    # REGRA: AULAS GEMINADAS OBRIGATÓRIAS
+    #
+    # Um par ocupa duas posições consecutivas
+    # da mesma disciplina, turma e professor.
+    #
+    # Não permitimos pares sobrepostos nem
+    # pares que atravessem regular/contraturno.
+
+    for i, vinculo in enumerate(vinculos):
+        quantidade_pares = vinculo.get("paresGeminados", 0)
+
+        if vinculo.get("geminadas") != "obrigatoria":
+            continue
+
+        if quantidade_pares <= 0:
+            continue
+
+        inicios = []
+        pares_por_posicao = defaultdict(list)
+
+        for dia in DIAS:
+            for periodo in ("regular", "contraturno"):
+
+                slots = [
+                    p for p in posicoes
+                    if p.split(":")[0] == dia
+                    and p.split(":")[1] == periodo
+                ]
+
+                for j in range(len(slots) - 1):
+                    primeira = slots[j]
+                    segunda = slots[j + 1]
+
+                    # Só cria o par se ambas as posições
+                    # estiverem disponíveis ao professor.
+                    if (i, primeira) not in x:
+                        continue
+
+                    if (i, segunda) not in x:
+                        continue
+
+                    par = modelo.new_bool_var(
+                        f"geminado_{i}_{dia}_{periodo}_{j}"
+                    )
+
+                    # Escolher o par obriga a alocação
+                    # das duas aulas consecutivas.
+                    modelo.add(
+                        x[(i, primeira)] == 1
+                    ).only_enforce_if(par)
+
+                    modelo.add(
+                        x[(i, segunda)] == 1
+                    ).only_enforce_if(par)
+
+                    inicios.append(par)
+                    pares_por_posicao[primeira].append(par)
+                    pares_por_posicao[segunda].append(par)
+
+        # Cada aula poderá pertencer a no máximo
+        # um dos pares obrigatórios escolhidos.
+        for slot, pares_do_slot in pares_por_posicao.items():
+            modelo.add(sum(pares_do_slot) <= 1)
+
+        # Obriga o número solicitado de pares
+        # distintos durante a semana.
+        modelo.add(
+            sum(inicios) == quantidade_pares
+        )
 
     # REGRA 6: Respeitar as aulas fixadas manualmente.
     for chave, atribuicao in fixadas.items():
