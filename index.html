@@ -1,0 +1,133 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GradeMestre | Gestão Escolar</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="logo">📚 Grade<span>Mestre</span></div>
+      <p class="sidebar-label">GESTÃO ESCOLAR</p>
+
+      <nav class="menu">
+        <button class="nav-item ativo" data-page="painel">◫ Painel geral</button>
+        <button class="nav-item" data-page="professores">♙ Professores</button>
+        <button class="nav-item" data-page="turmas">▦ Turmas</button>
+        <button class="nav-item" data-page="horarios">▤ Grade horária</button>
+        <button class="nav-item" data-page="configuracoes">⚙ Configurações</button>
+      </nav>
+      <div class="sidebar-bottom">GradeMestre • Versão 0.1</div>
+    </aside>
+
+    <main class="conteudo">
+      <header class="topbar">
+        <div>
+          <span class="subtitulo">SISTEMA DE HORÁRIOS ESCOLARES</span>
+          <h1 id="titulo-pagina">Painel geral</h1>
+        </div>
+        <span class="etiqueta">Ano letivo 2027</span>
+      </header>
+
+      <section id="painel" class="pagina ativa">
+        <div class="boas-vindas">
+          <h2>Bem-vindo ao GradeMestre!</h2>
+          <p>Organize professores, turmas e horários em um só lugar.</p>
+        </div>
+
+        <div class="cards">
+          <article class="card">
+            <p>Professores cadastrados</p>
+            <strong id="total-professores">0</strong>
+          </article>
+          <article class="card">
+            <p>Turmas cadastradas</p>
+            <strong id="total-turmas">0</strong>
+          </article>
+          <article class="card">
+            <p>Aulas semanais por turma</p>
+            <strong>30</strong>
+          </article>
+        </div>
+
+        <div class="painel-info">
+          <h3>Como começar?</h3>
+          <p>1. Configure a jornada escolar.</p>
+          <p>2. Cadastre os professores e suas disponibilidades.</p>
+          <p>3. Cadastre as turmas e distribua as disciplinas.</p>
+          <p>4. Gere e confira a grade horária.</p>
+          <button class="btn-primary" data-ir="configuracoes">
+            Configurar escola →
+          </button>
+        </div>
+      </section>
+
+      <section id="professores" class="pagina">
+        <div class="painel-info">
+          <h2>Professores</h2>
+          <p>Cadastro de professores, disciplinas e indisponibilidades.</p>
+          <p class="aviso">Módulo em desenvolvimento.</p>
+        </div>
+      </section>
+
+      <section id="turmas" class="pagina">
+        <div class="painel-info">
+          <h2>Turmas</h2>
+          <p>Cadastro de turmas e distribuição da carga horária semanal.</p>
+          <p class="aviso">Módulo em desenvolvimento.</p>
+        </div>
+      </section>
+
+      <section id="horarios" class="pagina">
+        <div class="painel-info">
+          <h2>Grade horária</h2>
+          <p>A geração automática estará disponível após implementarmos os cadastros e o algoritmo.</p>
+        </div>
+      </section>
+
+      <section id="configuracoes" class="pagina">
+        <div class="painel-info">
+          <h2>Configuração da escola</h2>
+          <p>Defina a organização semanal das aulas.</p>
+
+          <form id="form-config">
+            <label for="nome-escola">Nome do colégio</label>
+            <input id="nome-escola" type="text" placeholder="Nome do colégio">
+
+            <label for="modelo">Quantidade de aulas por período</label>
+            <select id="modelo" required>
+              <option value="6">6 aulas por dia</option>
+              <option value="5">5 aulas por dia + contraturno</option>
+            </select>
+
+            <div id="area-contraturno" hidden>
+              <label for="dia-contraturno">Dia do contraturno</label>
+              <select id="dia-contraturno">
+                <option value="segunda">Segunda-feira</option>
+                <option value="terca">Terça-feira</option>
+                <option value="quarta">Quarta-feira</option>
+                <option value="quinta">Quinta-feira</option>
+                <option value="sexta">Sexta-feira</option>
+              </select>
+            </div>
+
+            <div class="resumo">
+              <strong id="resumo-modelo">5 dias × 6 aulas</strong>
+              <span>Total: 30 aulas semanais por turma.</span>
+            </div>
+
+            <button class="btn-primary" type="submit">
+              Salvar configurações
+            </button>
+            <p id="mensagem-config" role="status"></p>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
