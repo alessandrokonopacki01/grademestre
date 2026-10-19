@@ -1,17 +1,11 @@
 
 const botaoGerar = document.getElementById("gerar-grade");
 const statusGerador = document.getElementById("status-gerador");
-const campoAPI = document.getElementById("endereco-api");
+const URL_API = "https://grademestre.onrender.com";
 
-campoAPI.value = localStorage.getItem("grademestre_api") || "";
 
 botaoGerar.addEventListener("click", async () => {
-  const endereco = campoAPI.value.trim().replace(/\/+$/, "");
-
-  if (!endereco || !/^https?:\/\/[^/]+/i.test(endereco)) {
-    statusGerador.textContent = "Informe a URL válida da API.";
-    return;
-  }
+  const endereco = URL_API;
 
   if (!turmas.length || !professores.length) {
     statusGerador.textContent =
@@ -63,8 +57,7 @@ botaoGerar.addEventListener("click", async () => {
     fixadas: preservar ? { ...grade } : {}
   };
 
-  localStorage.setItem("grademestre_api", endereco);
-
+ 
   botaoGerar.disabled = true;
   botaoGerar.textContent = "Calculando...";
   statusGerador.textContent =
