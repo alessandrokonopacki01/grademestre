@@ -406,8 +406,9 @@ function renderizarProfessores() {
 
       professores = professores.filter(p => p.id !== professor.id);
       salvarProfessores();
-      fecharEditorProfessor();
-      renderizarProfessores();
+fecharEditorProfessor();
+renderizarProfessores();
+renderizarTurmas();
     });
 
     acoes.append(editar, excluir);
