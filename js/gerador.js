@@ -34,6 +34,15 @@ botaoGerar.addEventListener("click", async () => {
     "preservar-aulas"
   ).checked;
 
+  if (preservar && gradeDesatualizada()) {
+  statusGerador.textContent =
+    "Os cadastros foram alterados. " +
+    "Desmarque 'Preservar aulas já preenchidas' " +
+    "para gerar novamente.";
+
+  return;
+}
+
   if (preservar) {
     const erroAtual = validarGrade(grade);
 

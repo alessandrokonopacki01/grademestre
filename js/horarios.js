@@ -1,6 +1,40 @@
 
 const CHAVE_GRADE = "grademestre_grade_v1";
 
+const CHAVE_REVISAO_GRADE = "grademestre_grade_revisao_v1";
+
+function assinaturaCadastros() {
+  const config = JSON.parse(
+    localStorage.getItem("grademestre_config") || "{}"
+  );
+
+  const turmasSalvas = JSON.parse(
+    localStorage.getItem("grademestre_turmas") || "[]"
+  );
+
+  const professoresSalvos = JSON.parse(
+    localStorage.getItem("grademestre_professores") || "[]"
+  );
+
+  return JSON.stringify({
+    config,
+    turmas: turmasSalvas,
+    professores: professoresSalvos
+  });
+}
+
+function gradeDesatualizada() {
+  if (Object.keys(grade).length === 0) return false;
+
+  return localStorage.getItem(CHAVE_REVISAO_GRADE) !==
+    assinaturaCadastros();
+}
+
+function avisarGradeDesatualizada() {
+  renderizarGrade();
+}
+
+
 const DIAS_GRADE = [
   { id: "segunda", nome: "Segunda" },
   { id: "terca", nome: "Terça" },
@@ -26,10 +60,21 @@ function carregarGrade() {
   }
 }
 
+
 function salvarGrade(dados) {
-  localStorage.setItem(CHAVE_GRADE, JSON.stringify(dados));
+  localStorage.setItem(
+    CHAVE_GRADE,
+    JSON.stringify(dados)
+  );
+
+  localStorage.setItem(
+    CHAVE_REVISAO_GRADE,
+    assinaturaCadastros()
+  );
+
   grade = dados;
 }
+
 
 function configGrade() {
   let c = {};
@@ -314,12 +359,35 @@ function mensagemGrade(texto, erro = false) {
   elemento.className = erro ? "erro" : "sucesso";
 }
 
+
 function aplicarAlteracao(novaGrade) {
+  if (gradeDesatualizada()) {
+    mensagemGrade(
+      "Cadastros alterados: gere uma nova grade antes de editar.",
+      true
+    );
+    return false;
+  }
+
   const erro = validarGrade(novaGrade);
 
   if (erro) {
     mensagemGrade(erro, true);
     return false;
+  }
+
+  // Uma grade completa deve continuar completa
+  // após qualquer alteração manual.
+  if (!validarGrade(grade, true)) {
+    const erroCompleto = validarGrade(novaGrade, true);
+
+    if (erroCompleto) {
+      mensagemGrade(
+        "Alteração rejeitada: " + erroCompleto,
+        true
+      );
+      return false;
+    }
   }
 
   try {
@@ -328,11 +396,15 @@ function aplicarAlteracao(novaGrade) {
     renderizarGrade();
     return true;
   } catch (erroSalvar) {
-    mensagemGrade("Não foi possível salvar a grade.", true);
+    mensagemGrade(
+      "Não foi possível salvar a grade.",
+      true
+    );
     console.error(erroSalvar);
     return false;
   }
 }
+
 
 function editarAula(chave) {
   const { turmaId } = dadosCelula(chave);
@@ -630,21 +702,15 @@ function renderizarGrade() {
     );
   }
 
-  const erro = validarGrade(grade);
+const erro = validarGrade(grade);
 
-  if (erro) {
-    mensagemGrade(
-      `Atenção: existem dados desatualizados. ${erro}`,
-      true
-    );
-  } else if (turmas.length) {
-    const erroFinal = validarGrade(grade, true);
-
-    mensagemGrade(
-      erroFinal || "Todas as 30 aulas estão distribuídas!",
-      !!erroFinal
-    );
-  }
+if (gradeDesatualizada()) {
+  mensagemGrade(
+    "Grade desatualizada: os cadastros mudaram. " +
+    "Gere novamente sem preservar as aulas.",
+    true
+  );
+} else if (erro) {
 }
 
 gh("atualizar-grade").addEventListener("click", () => {
@@ -652,16 +718,30 @@ gh("atualizar-grade").addEventListener("click", () => {
   renderizarGrade();
 });
 
+
 gh("imprimir-grade").addEventListener("click", () => {
-  const erro = validarGrade(grade);
+  if (gradeDesatualizada()) {
+    mensagemGrade(
+      "Grade desatualizada. Gere novamente antes de imprimir.",
+      true
+    );
+    return;
+  }
+
+  const erro = validarGrade(grade, true);
 
   if (erro) {
-    mensagemGrade(erro, true);
+    mensagemGrade(
+      "Impressão bloqueada: " + erro,
+      true
+    );
     return;
   }
 
   window.print();
 });
+
+
 
 gh("limpar-grade").addEventListener("click", () => {
   if (!confirm(
@@ -669,9 +749,19 @@ gh("limpar-grade").addEventListener("click", () => {
     "Os cadastros serão mantidos."
   )) return;
 
-  if (aplicarAlteracao({})) {
+  try {
+    salvarGrade({});
+    selecaoGrade = null;
+    renderizarGrade();
+
     mensagemGrade("Grade limpa com sucesso.");
+  } catch (erro) {
+    mensagemGrade(
+      "Não foi possível limpar a grade.",
+      true
+    );
   }
 });
+
 
 renderizarGrade();

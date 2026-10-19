@@ -96,7 +96,15 @@ document.getElementById("form-config").addEventListener(
         JSON.stringify(dados)
       );
 
-      mensagem.textContent = "Configurações salvas com sucesso!";
+
+mensagem.textContent =
+  "Configurações salvas. Confira se a grade precisa " +
+  "ser gerada novamente.";
+
+if (typeof avisarGradeDesatualizada === "function") {
+  avisarGradeDesatualizada();
+}
+
     } catch (erro) {
       mensagem.textContent = "Não foi possível salvar.";
       console.error(erro);

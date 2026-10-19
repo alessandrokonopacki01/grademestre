@@ -29,6 +29,9 @@ function salvarProfessores() {
     CHAVE_PROFESSORES,
     JSON.stringify(professores)
   );
+  if (typeof avisarGradeDesatualizada === "function") {
+  avisarGradeDesatualizada();
+}
 }
 
 function obterModeloEscolar() {
@@ -226,8 +229,15 @@ function adicionarVinculo(dados = {}) {
 
   // Nos novos cadastros, a exigência é obrigatória
   // por padrão para disciplinas com 2 ou mais aulas.
-  const modoInicial = dados.geminadas ||
-    (cargaInicial >= 2 ? "obrigatoria" : "livre");
+
+const cadastroNovo =
+  !Object.prototype.hasOwnProperty.call(dados, "turma");
+
+const modoInicial = dados.geminadas ||
+  (cadastroNovo && cargaInicial >= 2
+    ? "obrigatoria"
+    : "livre");
+
 
   selectGeminadas.value = modoInicial;
 
@@ -391,7 +401,8 @@ function validarVinculos(vinculos, maxDia) {
         "selecione a modalidade Livre.";
     }
 
-    if (v.geminadas === "obrigatoria" && v.maxDia < 2) {
+if (v.geminadas === "obrigatoria" &&
+    (v.maxDia < 2 || maxDia < 2)) {
       return "Aulas geminadas obrigatórias exigem " +
         "um limite diário de pelo menos 2 aulas.";
     }

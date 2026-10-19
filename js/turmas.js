@@ -19,6 +19,9 @@ function carregarTurmas() {
 function salvarTurmas() {
   localStorage.setItem(CHAVE_TURMAS, JSON.stringify(turmas));
 }
+if (typeof avisarGradeDesatualizada === "function") {
+  avisarGradeDesatualizada();
+}
 
 function normalizarNome(nome) {
   return nome.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
@@ -414,6 +417,9 @@ elTurma("form-turma").addEventListener("submit", evento => {
     renderizarProfessores();
     renderizarTurmas();
     fecharEditorTurma();
+    if (typeof avisarGradeDesatualizada === "function") {
+  avisarGradeDesatualizada();
+}
 
   } catch (erro) {
     alert("Erro ao salvar a turma.");
