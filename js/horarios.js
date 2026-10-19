@@ -702,16 +702,32 @@ function renderizarGrade() {
     );
   }
 
-const erro = validarGrade(grade);
 
-if (gradeDesatualizada()) {
-  mensagemGrade(
-    "Grade desatualizada: os cadastros mudaram. " +
-    "Gere novamente sem preservar as aulas.",
-    true
-  );
-} else if (erro) {
+  const erro = validarGrade(grade);
+
+  if (gradeDesatualizada()) {
+    mensagemGrade(
+      "Grade desatualizada: os cadastros mudaram. " +
+      "Gere novamente sem preservar as aulas.",
+      true
+    );
+
+  } else if (erro) {
+    mensagemGrade(
+      `Atenção: existem dados inválidos. ${erro}`,
+      true
+    );
+
+  } else if (turmas.length) {
+    const erroFinal = validarGrade(grade, true);
+
+    mensagemGrade(
+      erroFinal || "Todas as 30 aulas estão distribuídas!",
+      !!erroFinal
+    );
+  }
 }
+
 
 gh("atualizar-grade").addEventListener("click", () => {
   selecaoGrade = null;
