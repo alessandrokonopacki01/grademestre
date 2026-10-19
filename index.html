@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="js/app.js" defer></script>
     <script src="js/professores.js" defer></script>
+    <script src="js/turmas.js" defer></script>
 </head>
 
 <body>
@@ -126,13 +127,58 @@
                 </div>
             </section>
 
-            <section id="turmas" class="pagina">
-                <div class="painel-info">
-                    <h2>Turmas</h2>
-                    <p>Cadastro de turmas e distribuição da carga horária semanal.</p>
-                    <p class="aviso">Módulo em desenvolvimento.</p>
-                </div>
-            </section>
+            
+<section id="turmas" class="pagina">
+  <div class="painel-info">
+    <div class="cabecalho-modulo">
+      <div>
+        <h2>Turmas</h2>
+        <p>Organize as turmas e acompanhe as 30 aulas semanais.</p>
+      </div>
+
+      <button class="btn-primary" id="nova-turma">
+        + Nova turma
+      </button>
+    </div>
+
+    <div id="resumo-turmas" class="resumo-turmas"></div>
+    <div id="lista-turmas"></div>
+  </div>
+
+  <div class="painel-info" id="editor-turma" hidden>
+    <h2 id="titulo-editor-turma">Cadastrar turma</h2>
+
+    <form id="form-turma">
+      <input type="hidden" id="turma-id">
+
+      <label for="turma-nome">Identificação da turma</label>
+      <input
+        id="turma-nome"
+        type="text"
+        placeholder="Ex.: 1º A"
+        maxlength="60"
+        required
+      >
+
+      <p>
+        Os professores e as disciplinas aparecerão automaticamente
+        quando forem vinculados à turma no cadastro de professores.
+      </p>
+
+      <div class="acoes-form">
+        <button class="btn-primary" type="submit">
+          Salvar turma
+        </button>
+
+        <button class="btn-secundario" type="button"
+                id="cancelar-turma">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
 
             <section id="horarios" class="pagina">
                 <div class="painel-info">

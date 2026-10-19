@@ -490,9 +490,10 @@ $p("form-professor").addEventListener("submit", evento => {
   }
 
   try {
-    salvarProfessores();
-    fecharEditorProfessor();
-    renderizarProfessores();
+   salvarProfessores();
+fecharEditorProfessor();
+renderizarProfessores();
+renderizarTurmas();
   } catch (erro) {
     alert("Erro ao salvar os dados neste navegador.");
     console.error(erro);

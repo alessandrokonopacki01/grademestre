@@ -446,3 +446,120 @@ form select {
     grid-template-columns: 1fr;
   }
 }
+
+/* TURMAS */
+
+#editor-turma {
+  margin-top: 24px;
+}
+
+#editor-turma[hidden] {
+  display: none;
+}
+
+.resumo-turmas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.resumo-turmas .indicador {
+  background: #f8fafc;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.indicador strong {
+  display: block;
+  font-size: 28px;
+  margin-bottom: 5px;
+}
+
+.indicador span {
+  font-size: 13px;
+  color: var(--cinza);
+}
+
+.turma-card {
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.turma-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.turma-topo h3 {
+  margin: 0;
+}
+
+.progresso-turma {
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+  margin: 16px 0 10px;
+}
+
+.progresso-turma div {
+  height: 100%;
+  background: #2563eb;
+  transition: width 0.3s;
+}
+
+.situacao-turma {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.situacao-turma.completa {
+  color: #15803d;
+}
+
+.situacao-turma.incompleta {
+  color: #b45309;
+}
+
+.situacao-turma.excedida {
+  color: #b91c1c;
+}
+
+.tabela-turma {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.tabela-turma th,
+.tabela-turma td {
+  text-align: left;
+  padding: 11px;
+  border-bottom: 1px solid var(--borda);
+}
+
+.tabela-turma th {
+  background: #f8fafc;
+  font-size: 13px;
+}
+
+.tabela-turma td {
+  font-size: 14px;
+}
+
+.turma-detalhes {
+  overflow-x: auto;
+}
+
+@media (max-width: 700px) {
+  .resumo-turmas {
+    grid-template-columns: 1fr;
+  }
+}
