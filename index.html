@@ -10,6 +10,7 @@
     <script src="js/professores.js" defer></script>
     <script src="js/turmas.js" defer></script>
     <script src="js/horarios.js" defer></script>
+    <script src="js/gerador.js" defer></script>
 </head>
 
 <body>
@@ -207,6 +208,35 @@
         </button>
       </div>
     </div>
+
+<div class="painel-info painel-gerador">
+  <h3>Gerador automático</h3>
+
+  <p>
+    Informe o endereço da API e gere os horários
+    respeitando os cadastros da escola.
+  </p>
+
+  <label for="endereco-api">Endereço da API</label>
+  <input
+    id="endereco-api"
+    type="url"
+    placeholder="https://seu-servico.onrender.com"
+  >
+
+  <div class="opcao-gerador">
+    <label>
+      <input id="preservar-aulas" type="checkbox" checked>
+      Preservar aulas já preenchidas
+    </label>
+  </div>
+
+  <button id="gerar-grade" class="btn-primary">
+    Gerar horários automaticamente
+  </button>
+
+  <p id="status-gerador" role="status"></p>
+</div>
 
     <div id="resumo-grade"></div>
 

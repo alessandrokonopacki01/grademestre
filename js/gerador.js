@@ -1,0 +1,128 @@
+
+const botaoGerar = document.getElementById("gerar-grade");
+const statusGerador = document.getElementById("status-gerador");
+const campoAPI = document.getElementById("endereco-api");
+
+campoAPI.value = localStorage.getItem("grademestre_api") || "";
+
+botaoGerar.addEventListener("click", async () => {
+  const endereco = campoAPI.value.trim().replace(/\/+$/, "");
+
+  if (!endereco || !/^https?:\/\/[^/]+/i.test(endereco)) {
+    statusGerador.textContent = "Informe a URL válida da API.";
+    return;
+  }
+
+  if (!turmas.length || !professores.length) {
+    statusGerador.textContent =
+      "Cadastre turmas e professores antes de gerar.";
+    return;
+  }
+
+  for (const turma of turmas) {
+    const situacao = calcularSituacaoTurma(turma);
+
+    if (!situacao.completa) {
+      statusGerador.textContent =
+        `A turma ${turma.nome} possui ` +
+        `${situacao.total}/30 aulas cadastradas.`;
+      return;
+    }
+  }
+
+  const preservar = document.getElementById(
+    "preservar-aulas"
+  ).checked;
+
+  if (preservar) {
+    const erroAtual = validarGrade(grade);
+
+    if (erroAtual) {
+      statusGerador.textContent =
+        "A grade atual possui conflitos: " + erroAtual;
+      return;
+    }
+  }
+
+  const dados = {
+    config: {
+      modelo: String(configGrade().aulas),
+      contraturno: configGrade().contraturno
+    },
+    turmas,
+    professores,
+    fixadas: preservar ? { ...grade } : {}
+  };
+
+  localStorage.setItem("grademestre_api", endereco);
+
+  botaoGerar.disabled = true;
+  botaoGerar.textContent = "Calculando...";
+  statusGerador.textContent =
+    "Procurando uma distribuição válida...";
+
+  const controlador = new AbortController();
+  const limite = setTimeout(() => controlador.abort(), 90000);
+
+  try {
+    const resposta = await fetch(`${endereco}/gerar`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(dados),
+      signal: controlador.signal
+    });
+
+    let resultado;
+
+    try {
+      resultado = await resposta.json();
+    } catch {
+      throw new Error("A API não retornou JSON válido.");
+    }
+
+    if (!resposta.ok) {
+      throw new Error(
+        typeof resultado.detail === "string"
+          ? resultado.detail
+          : `Erro HTTP ${resposta.status}`
+      );
+    }
+
+    if (!resultado.sucesso) {
+      statusGerador.textContent =
+        resultado.mensagem || "Não foi possível gerar.";
+      return;
+    }
+
+    const erro = validarGrade(resultado.grade, true);
+
+    if (erro) {
+      throw new Error(
+        "O resultado recebido não passou na validação: " + erro
+      );
+    }
+
+    // Só substituímos os horários depois da validação.
+    salvarGrade(resultado.grade);
+    selecaoGrade = null;
+    renderizarGrade();
+
+    statusGerador.textContent =
+      `Horários gerados: ${resultado.totalAulas} aulas ` +
+      `distribuídas sem conflitos.`;
+
+  } catch (erro) {
+    statusGerador.textContent = erro.name === "AbortError"
+      ? "A requisição excedeu o tempo limite."
+      : `Falha na geração: ${erro.message}`;
+
+    console.error(erro);
+  } finally {
+    clearTimeout(limite);
+    botaoGerar.disabled = false;
+    botaoGerar.textContent =
+      "Gerar horários automaticamente";
+  }
+});

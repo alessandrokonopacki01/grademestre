@@ -754,3 +754,54 @@ form select {
     height: 58px;
   }
 }
+
+/* GERADOR AUTOMÁTICO */
+
+.painel-gerador {
+  margin-bottom: 24px;
+  background: #f8fafc;
+}
+
+.painel-gerador h3 {
+  margin-top: 0;
+}
+
+.painel-gerador label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+#endereco-api {
+  width: 100%;
+  max-width: 550px;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.opcao-gerador {
+  margin-top: 18px;
+}
+
+.opcao-gerador label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.opcao-gerador input {
+  width: 18px;
+  height: 18px;
+}
+
+#status-gerador {
+  font-weight: 600;
+  margin-top: 15px;
+}
+
+@media print {
+  .painel-gerador {
+    display: none !important;
+  }
+}
