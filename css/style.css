@@ -274,3 +274,175 @@ form select {
     flex-wrap: wrap;
   }
 }
+
+/* PROFESSORES */
+
+.cabecalho-modulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.cabecalho-modulo h2 {
+  margin-bottom: 5px;
+}
+
+.form-professor {
+  max-width: 100%;
+}
+
+.form-professor h3 {
+  margin-top: 30px;
+  border-bottom: 1px solid var(--borda);
+  padding-bottom: 12px;
+}
+
+.form-professor input {
+  max-width: 100%;
+}
+
+#editor-professor {
+  margin-top: 24px;
+}
+
+#editor-professor[hidden] {
+  display: none;
+}
+
+.btn-secundario {
+  background: white;
+  color: var(--primary);
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+  padding: 12px 18px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-secundario:hover {
+  background: #eff6ff;
+}
+
+.vinculo {
+  display: grid;
+  grid-template-columns: 1fr 1fr 105px 105px auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 14px;
+  padding: 15px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+}
+
+.vinculo label {
+  font-size: 12px;
+  margin-top: 0;
+}
+
+.vinculo input {
+  width: 100%;
+  min-width: 0;
+}
+
+.btn-remover {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 0;
+  border-radius: 8px;
+  padding: 13px;
+  cursor: pointer;
+}
+
+.grade-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+.tabela-disponibilidade {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.tabela-disponibilidade th,
+.tabela-disponibilidade td {
+  padding: 12px 8px;
+  border: 1px solid var(--borda);
+}
+
+.tabela-disponibilidade th {
+  background: #eff6ff;
+  font-size: 13px;
+}
+
+.tabela-disponibilidade input {
+  width: 18px;
+  height: 18px;
+  accent-color: #dc2626;
+  cursor: pointer;
+}
+
+.tabela-disponibilidade .contraturno {
+  background: #fef3c7;
+}
+
+.tabela-disponibilidade .sem-aula {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.professor-card {
+  border: 1px solid var(--borda);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.professor-card h3 {
+  margin: 0 0 10px;
+}
+
+.professor-card p {
+  margin: 5px 0;
+}
+
+.professor-card .acoes-form {
+  margin-top: 15px;
+}
+
+.acoes-form {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 24px;
+}
+
+.estado-vazio {
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 24px;
+  color: var(--cinza);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .vinculo {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .vinculo .btn-remover {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .vinculo {
+    grid-template-columns: 1fr;
+  }
+}
