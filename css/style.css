@@ -897,3 +897,230 @@ form select {
     display: none !important;
   }
 }
+
+/* =========================================
+   GRADEMESTRE — TEMA CONTRATA
+   PRETO E DOURADO
+   ========================================= */
+
+:root {
+  --fundo: #f7f5ef;
+  --sidebar: #101010;
+  --primary: #b89020;
+  --dourado: #d4af37;
+  --dourado-claro: #f8edcc;
+  --texto: #202020;
+  --cinza: #686868;
+  --borda: #e5ddca;
+}
+
+/* MENU LATERAL */
+
+.sidebar {
+  background: linear-gradient(180deg, #171717, #080808);
+  border-right: 2px solid var(--dourado);
+}
+
+.logo span {
+  color: var(--dourado);
+}
+
+.sidebar-label {
+  color: #d4af37;
+}
+
+.nav-item {
+  color: #d5d5d5;
+}
+
+.nav-item:hover,
+.nav-item.ativo {
+  background: rgba(212, 175, 55, 0.15);
+  color: #f5d978;
+  border-left: 3px solid var(--dourado);
+}
+
+/* PAINEL PRINCIPAL */
+
+.subtitulo {
+  color: #92700e;
+}
+
+.etiqueta {
+  background: #171717;
+  color: #f3d57a;
+}
+
+.boas-vindas {
+  background: linear-gradient(115deg, #111111, #373017);
+  border: 1px solid var(--dourado);
+}
+
+.boas-vindas h2 {
+  color: #f2cf65;
+}
+
+.boas-vindas p {
+  color: #e5e0d2;
+}
+
+.card,
+.painel-info {
+  background: #ffffff;
+  border-color: var(--borda);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.035);
+}
+
+.card strong {
+  color: #a67c12;
+}
+
+/* BOTÕES */
+
+.btn-primary {
+  background: linear-gradient(135deg, #d4af37, #b89020);
+  color: #101010;
+  font-weight: 700;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #e9c85a, #c69b22);
+}
+
+.btn-secundario {
+  background: #fffdf7;
+  color: #785b0c;
+  border-color: #d4af37;
+}
+
+.btn-secundario:hover {
+  background: var(--dourado-claro);
+}
+
+/* CAMPOS E FORMULÁRIOS */
+
+form input,
+form select,
+.vinculo select,
+.editor-horario select,
+#endereco-api {
+  border-color: #d8cba8;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #d4af37;
+  outline-offset: 1px;
+}
+
+/* CONFIGURAÇÕES */
+
+.resumo {
+  background: #fff9e7;
+  border-color: #e8d59b;
+}
+
+/* PROFESSORES */
+
+.professor-card,
+.vinculo {
+  border-color: var(--borda);
+}
+
+.tabela-disponibilidade th {
+  background: #f8edcc;
+}
+
+.tabela-disponibilidade input {
+  accent-color: #b89020;
+}
+
+/* TURMAS */
+
+.resumo-turmas .indicador,
+.tabela-turma th {
+  background: #faf7ee;
+}
+
+.progresso-turma div {
+  background: #d4af37;
+}
+
+/* GRADE HORÁRIA */
+
+.bloco-horario {
+  border-color: #d4af37;
+}
+
+.bloco-horario h3 {
+  background: #171717;
+  color: #f2cf65;
+}
+
+.tabela-horarios th {
+  background: #f4e6b7;
+  color: #302509;
+}
+
+.celula-aula:hover {
+  background: #fff3cd;
+}
+
+.celula-aula.selecionada {
+  background: #fff0b7;
+  outline-color: #b89020;
+}
+
+.celula-aula.preenchida {
+  background: #fffdf5;
+}
+
+.editor-horario {
+  background: #faf1d8;
+}
+
+/* GERADOR AUTOMÁTICO */
+
+.painel-gerador {
+  background: #faf7ee;
+}
+
+/* CONTRATURNO */
+
+.titulo-contraturno {
+  background: #ebd28b;
+  color: #322606;
+}
+
+/* DIAGNÓSTICO
+   Mantemos o vermelho/laranja para avisos importantes. */
+
+.painel-diagnostico {
+  background: #fff7ed;
+  border-color: #f5c58b;
+}
+
+/* IMPRESSÃO: PRIORIDADE À LEGIBILIDADE */
+
+@media print {
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .bloco-horario h3 {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border-bottom: 2px solid #000000;
+  }
+
+  .tabela-horarios th {
+    background: #eeeeee !important;
+    color: #000000 !important;
+  }
+
+  .celula-aula.preenchida {
+    background: #ffffff !important;
+  }
+}
