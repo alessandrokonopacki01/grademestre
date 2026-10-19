@@ -1,6 +1,7 @@
 
 from collections import defaultdict
 from ortools.sat.python import cp_model
+from diagnostico import diagnosticar
 
 DIAS = ["segunda", "terca", "quarta", "quinta", "sexta"]
 
@@ -68,6 +69,18 @@ def gerar_horarios(dados):
         if nome in turmas_por_nome:
             raise ValueError("Existem turmas com nomes repetidos.")
         turmas_por_nome[nome] = turma["id"]
+
+
+    # DIAGNÓSTICO PRELIMINAR
+    problemas = diagnosticar(dados)
+
+    if problemas:
+        return {
+            "sucesso": False,
+            "situacao": "inviavel",
+            "mensagem": "Foram encontradas restrições impossíveis.",
+            "diagnostico": problemas
+        }
 
     # Cada vínculo equivale a uma disciplina ministrada
     # por um professor para uma turma específica.
@@ -464,15 +477,36 @@ def gerar_horarios(dados):
     status = resolvedor.solve(modelo)
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+
         if status == cp_model.INFEASIBLE:
             return {
                 "sucesso": False,
                 "situacao": "inviavel",
                 "mensagem": (
-                    "Não existe distribuição possível com "
-                    "as restrições atuais."
-                )
+                    "O algoritmo comprovou que não existe "
+                    "uma solução com as restrições atuais."
+                ),
+                "diagnostico": [
+                    {
+                        "codigo": "CONFLITO_COMBINADO",
+                        "titulo": "Restrições incompatíveis",
+                        "detalhe": (
+                            "As verificações individuais não "
+                            "identificaram uma causa suficiente. "
+                            "Entretanto, a combinação das regras "
+                            "torna a grade impossível."
+                        ),
+                        "tipo": "possivel",
+                        "sugestoes": [
+                            "Revise as aulas geminadas obrigatórias.",
+                            "Confira as indisponibilidades compartilhadas.",
+                            "Revise os limites diários.",
+                            "Verifique as aulas fixadas manualmente."
+                        ]
+                    }
+                ]
             }
+
 
         return {
             "sucesso": False,

@@ -844,3 +844,56 @@ form select {
     grid-template-columns: 1fr;
   }
 }
+
+/* DIAGNÓSTICO INTELIGENTE */
+
+.painel-diagnostico {
+  margin-top: 24px;
+  padding: 22px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+}
+
+.painel-diagnostico[hidden] {
+  display: none;
+}
+
+.painel-diagnostico h3 {
+  margin-top: 0;
+  color: #9a3412;
+}
+
+.diagnostico-item {
+  background: white;
+  border: 1px solid #fed7aa;
+  padding: 18px;
+  margin-top: 14px;
+  border-radius: 10px;
+}
+
+.diagnostico-item h4 {
+  margin: 0 0 12px;
+  color: #9a3412;
+}
+
+.diagnostico-item strong {
+  display: block;
+  color: #b45309;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.diagnostico-item p {
+  line-height: 1.6;
+}
+
+.diagnostico-item li {
+  margin-bottom: 8px;
+}
+
+@media print {
+  .painel-diagnostico {
+    display: none !important;
+  }
+}
