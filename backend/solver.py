@@ -8,18 +8,19 @@ DIAS = ["segunda", "terca", "quarta", "quinta", "sexta"]
 
 def gerar_posicoes(config):
     modelo = str(config.get("modelo", "6"))
+
     if modelo not in ("5", "6"):
         raise ValueError("Modelo escolar inválido.")
 
     contraturno = config.get("contraturno", "segunda")
+
     if modelo == "5" and contraturno not in DIAS:
         raise ValueError("Dia do contraturno inválido.")
 
     posicoes = []
-    quantidade = int(modelo)
 
     for dia in DIAS:
-        for n in range(1, quantidade + 1):
+        for n in range(1, int(modelo) + 1):
             posicoes.append(f"{dia}:regular:{n}")
 
         if modelo == "5" and dia == contraturno:
@@ -51,10 +52,10 @@ def gerar_horarios(dados):
     ids_professores = [p["id"] for p in professores]
 
     if len(set(ids_turmas)) != len(ids_turmas):
-        raise ValueError("Existem identificadores de turmas repetidos.")
+        raise ValueError("Existem IDs de turmas repetidos.")
 
     if len(set(ids_professores)) != len(ids_professores):
-        raise ValueError("Existem professores com IDs repetidos.")
+        raise ValueError("Existem IDs de professores repetidos.")
 
     turmas_por_id = {t["id"]: t for t in turmas}
     professores_por_id = {p["id"]: p for p in professores}
@@ -66,12 +67,16 @@ def gerar_horarios(dados):
 
     for turma in turmas:
         nome = normalizar(turma["nome"])
+
         if nome in turmas_por_nome:
             raise ValueError("Existem turmas com nomes repetidos.")
+
         turmas_por_nome[nome] = turma["id"]
 
+    # ==========================================
+    # 1. DIAGNÓSTICO PRELIMINAR
+    # ==========================================
 
-    # DIAGNÓSTICO PRELIMINAR
     problemas = diagnosticar(dados)
 
     if problemas:
@@ -82,16 +87,18 @@ def gerar_horarios(dados):
             "diagnostico": problemas
         }
 
-    # Cada vínculo equivale a uma disciplina ministrada
-    # por um professor para uma turma específica.
-    vinculos = []
+    # ==========================================
+    # 2. LER OS VÍNCULOS DOS PROFESSORES
+    # ==========================================
+
+    vinculos_individuais = []
     chaves_vinculos = set()
     carga_turmas = defaultdict(int)
 
     for professor in professores:
         professor_id = professor["id"]
-
         max_dia = int(professor.get("maxDia", 0))
+
         if max_dia < 1:
             raise ValueError(
                 f"Limite diário inválido para {professor['nome']}."
@@ -107,23 +114,28 @@ def gerar_horarios(dados):
                     f"Turma não cadastrada: {vinculo.get('turma')}"
                 )
 
-            disciplina = str(vinculo.get("disciplina", "")).strip()
+            disciplina = str(
+                vinculo.get("disciplina", "")
+            ).strip()
+
             aulas = int(vinculo.get("aulas", 0))
             limite = int(vinculo.get("maxDia", 0))
 
             if not disciplina or aulas < 1 or limite < 1:
                 raise ValueError("Existe um vínculo incompleto.")
 
-            chave = (professor_id, turma_id, normalizar(disciplina))
+            chave = (
+                professor_id,
+                turma_id,
+                normalizar(disciplina)
+            )
 
             if chave in chaves_vinculos:
                 raise ValueError("Existem vínculos repetidos.")
 
             chaves_vinculos.add(chave)
 
-          
             geminadas = vinculo.get("geminadas", "livre")
-
             pares = int(vinculo.get("paresGeminados", 0))
 
             if geminadas not in ("livre", "obrigatoria"):
@@ -142,12 +154,10 @@ def gerar_horarios(dados):
             if geminadas == "obrigatoria":
                 if pares < 1 or limite < 2 or max_dia < 2:
                     raise ValueError(
-                        f"Revise os pares e os limites diários "
-                        f"de {disciplina}."
+                        f"Revise os pares e limites de {disciplina}."
                     )
 
-
-            vinculos.append({
+            vinculos_individuais.append({
                 "professorId": professor_id,
                 "turmaId": turma_id,
                 "disciplina": disciplina,
@@ -160,68 +170,86 @@ def gerar_horarios(dados):
                 ).strip()
             })
 
-
-    # DOCÊNCIA COMPARTILHADA
-    # Vínculos com o mesmo grupo representam
-    # a mesma aula, com vários professores.
+    # ==========================================
+    # 3. DOCÊNCIA COMPARTILHADA
+    # ==========================================
+    # Dois vínculos com o mesmo grupo e turma
+    # representam UMA aula com dois professores.
 
     grupos = {}
 
-    for v in vinculos:
-        codigo = v["grupoCompartilhado"]
+    for v in vinculos_individuais:
+        codigo = normalizar(v["grupoCompartilhado"])
 
         if codigo:
-            chave_grupo = (v["turmaId"], codigo.casefold())
+            chave_grupo = (
+                "compartilhado",
+                v["turmaId"],
+                codigo
+            )
         else:
             chave_grupo = (
-                v["turmaId"],
+                "individual",
                 v["professorId"],
-                normalizar(v["disciplina"]),
-                ""
+                v["turmaId"],
+                normalizar(v["disciplina"])
             )
 
         grupos.setdefault(chave_grupo, []).append(v)
 
-    aulas = []
+    vinculos = []
 
-    for membros in grupos.values():
+    for chave_grupo, membros in grupos.items():
         principal = membros[0]
-        ids = [v["professorId"] for v in membros]
 
-        if len(ids) != len(set(ids)):
+        professores_ids = [
+            membro["professorId"] for membro in membros
+        ]
+
+        if len(professores_ids) != len(set(professores_ids)):
             raise ValueError(
                 "Um grupo compartilhado possui professor repetido."
+            )
+
+        compartilhado = bool(principal["grupoCompartilhado"])
+
+        if compartilhado and len(membros) < 2:
+            raise ValueError(
+                f"O grupo {principal['grupoCompartilhado']} "
+                "precisa de pelo menos dois professores."
             )
 
         for membro in membros[1:]:
             if (
                 membro["aulas"] != principal["aulas"]
-                or normalizar(membro["disciplina"]) !=
-                   normalizar(principal["disciplina"])
+                or normalizar(membro["disciplina"])
+                != normalizar(principal["disciplina"])
                 or membro["geminadas"] != principal["geminadas"]
-                or membro["paresGeminados"] !=
-                   principal["paresGeminados"]
+                or membro["paresGeminados"]
+                != principal["paresGeminados"]
             ):
                 raise ValueError(
-                    "Professores do mesmo grupo devem ter "
-                    "disciplina, carga e geminadas iguais."
+                    "Os professores do grupo compartilhado "
+                    "precisam ter a mesma disciplina, "
+                    "carga semanal e configuração de geminadas."
                 )
 
-        if principal["grupoCompartilhado"] and len(membros) < 2:
-            raise ValueError(
-                "Grupo compartilhado precisa de pelo menos "
-                "dois professores."
-            )
-
-        aulas.append({
+        novo_vinculo = {
             **principal,
-            "professoresIds": ids,
-            "maxDia": min(v["maxDia"] for v in membros)
-        })
+            "professoresIds": professores_ids,
+            "maxDia": min(
+                membro["maxDia"] for membro in membros
+            )
+        }
 
+        vinculos.append(novo_vinculo)
+
+        # Contabiliza a aula UMA vez para a turma.
         carga_turmas[principal["turmaId"]] += principal["aulas"]
 
-    vinculos = aulas
+    # ==========================================
+    # 4. VALIDAR AS 30 AULAS DAS TURMAS
+    # ==========================================
 
     for turma in turmas:
         total = carga_turmas[turma["id"]]
@@ -229,27 +257,29 @@ def gerar_horarios(dados):
         if total != 30:
             raise ValueError(
                 f"A turma {turma['nome']} possui {total} "
-                f"aulas cadastradas. São necessárias 30."
+                "aulas cadastradas. São necessárias 30."
             )
+
+    # ==========================================
+    # 5. CRIAR MODELO DE OTIMIZAÇÃO
+    # ==========================================
 
     modelo = cp_model.CpModel()
 
-    # x[(vinculo, posicao)] = 1 se aquela aula
-    # estiver alocada na posição especificada.
+    # x[(i, posicao)] representa a alocação
+    # do vínculo lógico i naquela posição.
     x = {}
 
-
     for i, vinculo in enumerate(vinculos):
-
         bloqueios = set()
 
+        # União dos bloqueios dos participantes.
         for professor_id in vinculo["professoresIds"]:
             professor = professores_por_id[professor_id]
 
             bloqueios.update(
                 professor.get("indisponibilidades", [])
             )
-
 
         for posicao in posicoes:
             if posicao in bloqueios:
@@ -259,8 +289,17 @@ def gerar_horarios(dados):
                 f"aula_{i}_{posicao}"
             )
 
-    def variaveis(i=None, turma=None, professor=None,
-                  dia=None, posicao=None):
+    # ==========================================
+    # 6. CONSULTAR VARIÁVEIS
+    # ==========================================
+
+    def variaveis(
+        i=None,
+        turma=None,
+        professor=None,
+        dia=None,
+        posicao=None
+    ):
         resultado = []
 
         for (indice, slot), variavel in x.items():
@@ -269,16 +308,17 @@ def gerar_horarios(dados):
             if i is not None and indice != i:
                 continue
 
-            if turma is not None and vinculo["turmaId"] != turma:
-                continue
+            if turma is not None:
+                if vinculo["turmaId"] != turma:
+                    continue
 
-if (
-    professor is not None
-    and professor not in vinculo["professoresIds"]
-):
-    continue
-    if dia is not None and slot.split(":")[0] != dia:
-                continue
+            if professor is not None:
+                if professor not in vinculo["professoresIds"]:
+                    continue
+
+            if dia is not None:
+                if slot.split(":")[0] != dia:
+                    continue
 
             if posicao is not None and slot != posicao:
                 continue
@@ -287,67 +327,82 @@ if (
 
         return resultado
 
-    # REGRA 1: Cumprir exatamente cada carga semanal.
+    # ==========================================
+    # REGRA 1: CARGA SEMANAL
+    # ==========================================
+
     for i, vinculo in enumerate(vinculos):
         modelo.add(
             sum(variaveis(i=i)) == vinculo["aulas"]
         )
 
-    # REGRA 2: Cada turma terá exatamente uma aula
-    # em cada uma das 30 posições semanais.
+    # ==========================================
+    # REGRA 2: UMA AULA POR TURMA/POSIÇÃO
+    # ==========================================
+
     for turma in turmas:
         for posicao in posicoes:
             modelo.add(
-                sum(variaveis(
-                    turma=turma["id"],
-                    posicao=posicao
-                )) == 1
+                sum(
+                    variaveis(
+                        turma=turma["id"],
+                        posicao=posicao
+                    )
+                ) == 1
             )
 
-    # REGRA 3: Um professor não pode ocupar
-    # duas turmas ao mesmo tempo.
+    # ==========================================
+    # REGRA 3: PROFESSOR SEM SOBREPOSIÇÃO
+    # ==========================================
+
     for professor in professores:
         for posicao in posicoes:
             modelo.add(
-                sum(variaveis(
-                    professor=professor["id"],
-                    posicao=posicao
-                )) <= 1
+                sum(
+                    variaveis(
+                        professor=professor["id"],
+                        posicao=posicao
+                    )
+                ) <= 1
             )
 
-    # REGRA 4: Limite total diário de cada professor.
+    # ==========================================
+    # REGRA 4: LIMITE DIÁRIO DO PROFESSOR
+    # ==========================================
+
     for professor in professores:
         for dia in DIAS:
             modelo.add(
-                sum(variaveis(
-                    professor=professor["id"],
-                    dia=dia
-                )) <= int(professor["maxDia"])
+                sum(
+                    variaveis(
+                        professor=professor["id"],
+                        dia=dia
+                    )
+                ) <= int(professor["maxDia"])
             )
 
-    # REGRA 5: Limite diário por disciplina/turma.
+    # ==========================================
+    # REGRA 5: LIMITE DIÁRIO DO VÍNCULO
+    # ==========================================
+
     for i, vinculo in enumerate(vinculos):
         for dia in DIAS:
             modelo.add(
-                sum(variaveis(i=i, dia=dia)) <=
-                vinculo["maxDia"]
+                sum(variaveis(i=i, dia=dia))
+                <= vinculo["maxDia"]
             )
 
-    # REGRA: AULAS GEMINADAS OBRIGATÓRIAS
-    #
-    # Um par ocupa duas posições consecutivas
-    # da mesma disciplina, turma e professor.
-    #
-    # Não permitimos pares sobrepostos nem
-    # pares que atravessem regular/contraturno.
+    # ==========================================
+    # REGRA 6: AULAS GEMINADAS OBRIGATÓRIAS
+    # ==========================================
 
     for i, vinculo in enumerate(vinculos):
         quantidade_pares = vinculo.get("paresGeminados", 0)
 
-        if vinculo.get("geminadas") != "obrigatoria":
-            continue
-
-        if quantidade_pares <= 0:
+        if (
+            vinculo.get("geminadas") != "obrigatoria"
+            or quantidade_pares <= 0
+        ):
             continue
 
         inicios = []
@@ -355,7 +410,6 @@ if (
 
         for dia in DIAS:
             for periodo in ("regular", "contraturno"):
-
                 slots = [
                     p for p in posicoes
                     if p.split(":")[0] == dia
@@ -366,8 +420,6 @@ if (
                     primeira = slots[j]
                     segunda = slots[j + 1]
 
-                    # Só cria o par se ambas as posições
-                    # estiverem disponíveis ao professor.
                     if (i, primeira) not in x:
                         continue
 
@@ -378,8 +430,6 @@ if (
                         f"geminado_{i}_{dia}_{periodo}_{j}"
                     )
 
-                    # Escolher o par obriga a alocação
-                    # das duas aulas consecutivas.
                     modelo.add(
                         x[(i, primeira)] == 1
                     ).only_enforce_if(par)
@@ -392,50 +442,81 @@ if (
                     pares_por_posicao[primeira].append(par)
                     pares_por_posicao[segunda].append(par)
 
-        # Cada aula poderá pertencer a no máximo
-        # um dos pares obrigatórios escolhidos.
-        for slot, pares_do_slot in pares_por_posicao.items():
-            modelo.add(sum(pares_do_slot) <= 1)
+        # Evita sobreposição entre pares escolhidos.
+        for pares_slot in pares_por_posicao.values():
+            modelo.add(sum(pares_slot) <= 1)
 
-        # Obriga o número solicitado de pares
-        # distintos durante a semana.
         modelo.add(
             sum(inicios) == quantidade_pares
         )
 
-    # REGRA 6: Respeitar as aulas fixadas manualmente.
+    # ==========================================
+    # REGRA 7: AULAS FIXADAS
+    # ==========================================
+
     for chave, atribuicao in fixadas.items():
         if "|" not in chave or not isinstance(atribuicao, dict):
             raise ValueError("Aula fixada inválida.")
 
         turma_id, posicao = chave.split("|", 1)
 
-        if turma_id not in turmas_por_id or posicao not in conjunto_posicoes:
-            raise ValueError("Uma aula fixada está fora da grade.")
+        if (
+            turma_id not in turmas_por_id
+            or posicao not in conjunto_posicoes
+        ):
+            raise ValueError(
+                "Uma aula fixada está fora da grade."
+            )
 
-        correspondente = [
-            i for i, v in enumerate(vinculos)
-            if v["turmaId"] == turma_id
-            and atribuicao.get("professorId") in v["professoresIds"]
-            and normalizar(v["disciplina"]) ==
-                normalizar(atribuicao.get("disciplina", ""))
-        ]
+        ids_fixados = atribuicao.get("professoresIds")
+
+        if isinstance(ids_fixados, list) and ids_fixados:
+            ids_fixados = set(ids_fixados)
+        else:
+            ids_fixados = None
+
+        correspondente = []
+
+        for i, v in enumerate(vinculos):
+            if v["turmaId"] != turma_id:
+                continue
+
+            if normalizar(v["disciplina"]) != normalizar(
+                atribuicao.get("disciplina", "")
+            ):
+                continue
+
+            if ids_fixados is not None:
+                if set(v["professoresIds"]) != ids_fixados:
+                    continue
+            elif (
+                atribuicao.get("professorId")
+                not in v["professoresIds"]
+            ):
+                continue
+
+            correspondente.append(i)
 
         if len(correspondente) != 1:
-            raise ValueError("Vínculo de aula fixada não encontrado.")
+            raise ValueError(
+                "Vínculo da aula fixada não encontrado."
+            )
 
         variavel = x.get((correspondente[0], posicao))
 
         if variavel is None:
             raise ValueError(
-                "Uma aula fixada viola a disponibilidade do professor."
+                "Uma aula fixada viola a disponibilidade "
+                "de um dos professores."
             )
 
         modelo.add(variavel == 1)
 
-    # Preferência: manter as aulas de cada vínculo
-    # distribuídas por mais dias, quando possível.
-    penalidades = []
+    # ==========================================
+    # 8. PREFERÊNCIA POR DISTRIBUIR DISCIPLINAS
+    # ==========================================
+
+    penalidades_distribuicao = []
 
     for i, vinculo in enumerate(vinculos):
         for dia in DIAS:
@@ -445,14 +526,20 @@ if (
                 continue
 
             excesso = modelo.new_int_var(
-                0, len(vars_dia), f"excesso_{i}_{dia}"
+                0,
+                len(vars_dia),
+                f"excesso_{i}_{dia}"
             )
 
-            modelo.add(excesso >= sum(vars_dia) - 1)
-            penalidades.append(excesso)
+            modelo.add(
+                excesso >= sum(vars_dia) - 1
+            )
 
-    
-    # OTIMIZAÇÃO: REDUZIR JANELAS DOS PROFESSORES
+            penalidades_distribuicao.append(excesso)
+
+    # ==========================================
+    # 9. OTIMIZAÇÃO DE JANELAS
+    # ==========================================
 
     penalidades_janelas = []
 
@@ -460,10 +547,7 @@ if (
         professor_id = professor["id"]
 
         for dia in DIAS:
-            # Regular e contraturno são considerados
-            # períodos separados.
             for periodo in ("regular", "contraturno"):
-
                 slots = [
                     p for p in posicoes
                     if p.split(":")[0] == dia
@@ -481,18 +565,17 @@ if (
                     )
 
                     modelo.add(
-                        sum(variaveis(
-                            professor=professor_id,
-                            posicao=posicao
-                        )) == ocupado
+                        sum(
+                            variaveis(
+                                professor=professor_id,
+                                posicao=posicao
+                            )
+                        ) == ocupado
                     )
 
                     ocupados.append(ocupado)
 
-                # Uma janela é uma posição vazia
-                # com pelo menos uma aula antes e outra depois.
                 for indice in range(1, len(slots) - 1):
-
                     anterior = modelo.new_bool_var(
                         f"antes_{professor_id}_{dia}_"
                         f"{periodo}_{indice}"
@@ -518,11 +601,11 @@ if (
                         ocupados[indice + 1:]
                     )
 
-                    # Janela = anterior E posterior
-                    #          E NÃO ocupado.
                     modelo.add(janela <= anterior)
                     modelo.add(janela <= posterior)
-                    modelo.add(janela + ocupados[indice] <= 1)
+                    modelo.add(
+                        janela + ocupados[indice] <= 1
+                    )
 
                     modelo.add(
                         janela >= anterior + posterior
@@ -531,81 +614,89 @@ if (
 
                     penalidades_janelas.append(janela)
 
-    # Janelas têm prioridade sobre a preferência
-    # anterior de distribuir disciplinas.
+    # ==========================================
+    # 10. FUNÇÃO OBJETIVO
+    # ==========================================
+
     PESO_JANELAS = 100
     PESO_DISTRIBUICAO = 1
 
     modelo.minimize(
         PESO_JANELAS * sum(penalidades_janelas)
-        + PESO_DISTRIBUICAO * sum(penalidades)
+        + PESO_DISTRIBUICAO
+        * sum(penalidades_distribuicao)
     )
 
+    # ==========================================
+    # 11. EXECUTAR O SOLVER
+    # ==========================================
 
     resolvedor = cp_model.CpSolver()
+
     resolvedor.parameters.max_time_in_seconds = 25.0
     resolvedor.parameters.num_search_workers = 4
 
     status = resolvedor.solve(modelo)
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-
         if status == cp_model.INFEASIBLE:
             return {
                 "sucesso": False,
                 "situacao": "inviavel",
                 "mensagem": (
                     "O algoritmo comprovou que não existe "
-                    "uma solução com as restrições atuais."
+                    "solução com as restrições atuais."
                 ),
                 "diagnostico": [
                     {
                         "codigo": "CONFLITO_COMBINADO",
                         "titulo": "Restrições incompatíveis",
                         "detalhe": (
-                            "As verificações individuais não "
-                            "identificaram uma causa suficiente. "
-                            "Entretanto, a combinação das regras "
-                            "torna a grade impossível."
+                            "As restrições individuais não "
+                            "explicam isoladamente o problema, "
+                            "mas sua combinação impede a grade."
                         ),
                         "tipo": "possivel",
                         "sugestoes": [
-                            "Revise as aulas geminadas obrigatórias.",
-                            "Confira as indisponibilidades compartilhadas.",
-                            "Revise os limites diários.",
-                            "Verifique as aulas fixadas manualmente."
+                            "Revise as aulas geminadas.",
+                            "Confira as indisponibilidades.",
+                            "Revise os grupos compartilhados.",
+                            "Confira as aulas fixadas."
                         ]
                     }
                 ]
             }
-
 
         return {
             "sucesso": False,
             "situacao": "limite_ou_erro",
             "mensagem": (
                 "Não foi encontrada solução no tempo disponível. "
-                "Isso não prova que o horário seja impossível."
+                "Isso não comprova que a grade seja impossível."
             )
         }
+
+    # ==========================================
+    # 12. MONTAR O RESULTADO
+    # ==========================================
 
     resultado = {}
 
     for (i, posicao), variavel in x.items():
-        if resolvedor.value(variavel) == 1:
-            vinculo = vinculos[i]
+        if resolvedor.value(variavel) != 1:
+            continue
 
-            chave = f"{vinculo['turmaId']}|{posicao}"
+        vinculo = vinculos[i]
+        chave = f"{vinculo['turmaId']}|{posicao}"
 
-
-            resultado[chave] = {
-                "professorId": vinculo["professorId"],
-                "professoresIds": vinculo["professoresIds"],
-                "disciplina": vinculo["disciplina"],
-                "grupoCompartilhado":
-                    vinculo["grupoCompartilhado"]
-            }
-
+        resultado[chave] = {
+            "professorId": vinculo["professorId"],
+            "professoresIds": vinculo["professoresIds"],
+            "disciplina": vinculo["disciplina"],
+            "grupoCompartilhado": (
+                vinculo["grupoCompartilhado"]
+            )
+        }
 
     return {
         "sucesso": True,
