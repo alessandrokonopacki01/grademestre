@@ -146,6 +146,7 @@ def gerar_horarios(dados):
                         f"de {disciplina}."
                     )
 
+
             vinculos.append({
                 "professorId": professor_id,
                 "turmaId": turma_id,
@@ -153,11 +154,74 @@ def gerar_horarios(dados):
                 "aulas": aulas,
                 "maxDia": limite,
                 "geminadas": geminadas,
-                "paresGeminados": pares
+                "paresGeminados": pares,
+                "grupoCompartilhado": str(
+                    vinculo.get("grupoCompartilhado") or ""
+                ).strip()
             })
 
 
-            carga_turmas[turma_id] += aulas
+    # DOCÊNCIA COMPARTILHADA
+    # Vínculos com o mesmo grupo representam
+    # a mesma aula, com vários professores.
+
+    grupos = {}
+
+    for v in vinculos:
+        codigo = v["grupoCompartilhado"]
+
+        if codigo:
+            chave_grupo = (v["turmaId"], codigo.casefold())
+        else:
+            chave_grupo = (
+                v["turmaId"],
+                v["professorId"],
+                normalizar(v["disciplina"]),
+                ""
+            )
+
+        grupos.setdefault(chave_grupo, []).append(v)
+
+    aulas = []
+
+    for membros in grupos.values():
+        principal = membros[0]
+        ids = [v["professorId"] for v in membros]
+
+        if len(ids) != len(set(ids)):
+            raise ValueError(
+                "Um grupo compartilhado possui professor repetido."
+            )
+
+        for membro in membros[1:]:
+            if (
+                membro["aulas"] != principal["aulas"]
+                or normalizar(membro["disciplina"]) !=
+                   normalizar(principal["disciplina"])
+                or membro["geminadas"] != principal["geminadas"]
+                or membro["paresGeminados"] !=
+                   principal["paresGeminados"]
+            ):
+                raise ValueError(
+                    "Professores do mesmo grupo devem ter "
+                    "disciplina, carga e geminadas iguais."
+                )
+
+        if principal["grupoCompartilhado"] and len(membros) < 2:
+            raise ValueError(
+                "Grupo compartilhado precisa de pelo menos "
+                "dois professores."
+            )
+
+        aulas.append({
+            **principal,
+            "professoresIds": ids,
+            "maxDia": min(v["maxDia"] for v in membros)
+        })
+
+        carga_turmas[principal["turmaId"]] += principal["aulas"]
+
+    vinculos = aulas
 
     for turma in turmas:
         total = carga_turmas[turma["id"]]
@@ -174,12 +238,18 @@ def gerar_horarios(dados):
     # estiver alocada na posição especificada.
     x = {}
 
-    for i, vinculo in enumerate(vinculos):
-        professor = professores_por_id[vinculo["professorId"]]
 
-        bloqueios = set(
-            professor.get("indisponibilidades", [])
-        )
+    for i, vinculo in enumerate(vinculos):
+
+        bloqueios = set()
+
+        for professor_id in vinculo["professoresIds"]:
+            professor = professores_por_id[professor_id]
+
+            bloqueios.update(
+                professor.get("indisponibilidades", [])
+            )
+
 
         for posicao in posicoes:
             if posicao in bloqueios:
@@ -202,8 +272,11 @@ def gerar_horarios(dados):
             if turma is not None and vinculo["turmaId"] != turma:
                 continue
 
-            if professor is not None and vinculo["professorId"] != professor:
-                continue
+if (
+    professor is not None
+    and professor not in vinculo["professoresIds"]
+):
+    continue
 
             if dia is not None and slot.split(":")[0] != dia:
                 continue
@@ -344,7 +417,7 @@ def gerar_horarios(dados):
         correspondente = [
             i for i, v in enumerate(vinculos)
             if v["turmaId"] == turma_id
-            and v["professorId"] == atribuicao.get("professorId")
+            and atribuicao.get("professorId") in v["professoresIds"]
             and normalizar(v["disciplina"]) ==
                 normalizar(atribuicao.get("disciplina", ""))
         ]
@@ -525,10 +598,15 @@ def gerar_horarios(dados):
 
             chave = f"{vinculo['turmaId']}|{posicao}"
 
+
             resultado[chave] = {
                 "professorId": vinculo["professorId"],
-                "disciplina": vinculo["disciplina"]
+                "professoresIds": vinculo["professoresIds"],
+                "disciplina": vinculo["disciplina"],
+                "grupoCompartilhado":
+                    vinculo["grupoCompartilhado"]
             }
+
 
     return {
         "sucesso": True,
