@@ -6,7 +6,55 @@ from diagnostico import diagnosticar
 DIAS = ["segunda", "terca", "quarta", "quinta", "sexta"]
 
 
-def gerar_posicoes(config):
+
+def gerar_posicoes(config, turma=None):
+    modelo = str(config.get("modelo", "6"))
+
+    if modelo not in ("5", "6"):
+        raise ValueError("Modelo escolar inválido.")
+
+    quantidade = int(modelo)
+
+    carga = (
+        30 if quantidade == 6
+        else int((turma or {}).get("aulasSemanais", 30))
+    )
+
+    if carga not in (25, 30):
+        raise ValueError("Carga semanal inválida.")
+
+    if quantidade == 6 and carga != 30:
+        raise ValueError(
+            "Escolas com seis aulas por dia "
+            "exigem 30 aulas semanais por turma."
+        )
+
+    dia_ct = (
+        (turma or {}).get("diaContraturno")
+        or config.get("contraturno", "segunda")
+    )
+
+    if quantidade == 5 and carga == 30 and dia_ct not in DIAS:
+        raise ValueError("Dia do contraturno inválido.")
+
+    posicoes = []
+
+    for dia in DIAS:
+        for n in range(1, quantidade + 1):
+            posicoes.append(f"{dia}:regular:{n}")
+
+        if (
+            quantidade == 5
+            and carga == 30
+            and dia == dia_ct
+        ):
+            for n in range(1, 6):
+                posicoes.append(
+                    f"{dia}:contraturno:{n}"
+                )
+
+    return posicoes
+
     modelo = str(config.get("modelo", "6"))
 
     if modelo not in ("5", "6"):
@@ -45,8 +93,34 @@ def gerar_horarios(dados):
     if not isinstance(fixadas, dict):
         raise ValueError("Formato de aulas fixadas inválido.")
 
-    posicoes = gerar_posicoes(config)
-    conjunto_posicoes = set(posicoes)
+
+    # Cada turma possui suas próprias posições.
+    posicoes_turmas = {
+        turma["id"]: gerar_posicoes(config, turma)
+        for turma in turmas
+    }
+
+    conjunto_turmas = {
+        turma_id: set(lista)
+        for turma_id, lista in posicoes_turmas.items()
+    }
+
+    # União de todos os horários existentes na escola.
+    posicoes_gerais = sorted(
+        {
+            posicao
+            for lista in posicoes_turmas.values()
+            for posicao in lista
+        },
+        key=lambda p: (
+            DIAS.index(p.split(":")[0]),
+            0 if p.split(":")[1] == "regular" else 1,
+            int(p.split(":")[2])
+        )
+    )
+
+    posicoes = posicoes_gerais
+
 
     ids_turmas = [t["id"] for t in turmas]
     ids_professores = [p["id"] for p in professores]
@@ -251,14 +325,20 @@ def gerar_horarios(dados):
     # 4. VALIDAR AS 30 AULAS DAS TURMAS
     # ==========================================
 
-    for turma in turmas:
-        total = carga_turmas[turma["id"]]
 
-        if total != 30:
+    for turma in turmas:
+        turma_id = turma["id"]
+
+        total = carga_turmas[turma_id]
+        necessario = len(posicoes_turmas[turma_id])
+
+        if total != necessario:
             raise ValueError(
                 f"A turma {turma['nome']} possui {total} "
-                "aulas cadastradas. São necessárias 30."
+                f"aulas cadastradas. São necessárias "
+                f"{necessario}."
             )
+
 
     # ==========================================
     # 5. CRIAR MODELO DE OTIMIZAÇÃO
@@ -281,7 +361,7 @@ def gerar_horarios(dados):
                 professor.get("indisponibilidades", [])
             )
 
-        for posicao in posicoes:
+        for posicao in posicoes_turmas[vinculo["turmaId"]]:
             if posicao in bloqueios:
                 continue
 
@@ -341,7 +421,7 @@ def gerar_horarios(dados):
     # ==========================================
 
     for turma in turmas:
-        for posicao in posicoes:
+        for posicao in posicoes_turmas[turma["id"]]:
             modelo.add(
                 sum(
                     variaveis(
@@ -462,7 +542,7 @@ def gerar_horarios(dados):
 
         if (
             turma_id not in turmas_por_id
-            or posicao not in conjunto_posicoes
+            or posicao not in conjunto_turmas[turma_id]
         ):
             raise ValueError(
                 "Uma aula fixada está fora da grade."

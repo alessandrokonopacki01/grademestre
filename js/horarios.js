@@ -84,17 +84,25 @@ function nomeNormalizado(texto) {
     .toLocaleLowerCase("pt-BR");
 }
 
-function posicoesGrade() {
+
+function posicoesTurmaGrade(turma) {
   const config = configGrade();
   const posicoes = [];
+
+  const temCT =
+    config.aulas === 5 &&
+    cargaSemanalTurma(turma) === 30;
+
+  const diaCT = temCT
+    ? contraturnoTurma(turma)
+    : null;
 
   DIAS_GRADE.forEach(dia => {
     for (let n = 1; n <= config.aulas; n++) {
       posicoes.push(`${dia.id}:regular:${n}`);
     }
 
-    if (config.aulas === 5 &&
-        dia.id === config.contraturno) {
+    if (temCT && dia.id === diaCT) {
       for (let n = 1; n <= 5; n++) {
         posicoes.push(`${dia.id}:contraturno:${n}`);
       }
@@ -103,6 +111,19 @@ function posicoesGrade() {
 
   return posicoes;
 }
+
+function posicoesGrade() {
+  const conjunto = new Set();
+
+  turmas.forEach(turma => {
+    posicoesTurmaGrade(turma).forEach(pos => {
+      conjunto.add(pos);
+    });
+  });
+
+  return [...conjunto];
+}
+
 
 function chaveCelula(turmaId, posicao) {
   return `${turmaId}|${posicao}`;
@@ -254,7 +275,6 @@ function encontrarVinculo(turma, atribuicao) {
 // Valida a grade inteira.
 function validarGrade(dados, verificarCompletude = false) {
   const posicoes = posicoesGrade();
-  const conjuntoPosicoes = new Set(posicoes);
   const ocupacoes = new Set();
   const totais = new Map();
   const diarios = new Map();
@@ -277,7 +297,7 @@ function validarGrade(dados, verificarCompletude = false) {
     const { turmaId, posicao } = dadosCelula(chave);
     const turma = turmas.find(t => t.id === turmaId);
 
-    if (!turma || !conjuntoPosicoes.has(posicao)) {
+if (!turma || !posicoesTurmaGrade(turma).includes(posicao)) {
       return "Há uma aula em uma turma ou posição inexistente.";
     }
 
@@ -344,13 +364,17 @@ function validarGrade(dados, verificarCompletude = false) {
       return "Cadastre pelo menos uma turma.";
     }
 
+
     for (const turma of turmas) {
-      const total = posicoes.filter(pos =>
+      const posicoesTurma = posicoesTurmaGrade(turma);
+      const meta = cargaSemanalTurma(turma);
+
+      const total = posicoesTurma.filter(pos =>
         !!dados[chaveCelula(turma.id, pos)]
       ).length;
 
-      if (total !== 30) {
-        return `A turma ${turma.nome} possui ${total}/30 aulas.`;
+      if (total !== meta) {
+        return `A turma ${turma.nome} possui ${total}/${meta} aulas.`;
       }
 
       const distribuicao = obterDistribuicaoTurma(turma.nome);
@@ -358,11 +382,12 @@ function validarGrade(dados, verificarCompletude = false) {
       if (
         distribuicao.reduce(
           (s, v) => s + Number(v.aulas), 0
-        ) !== 30
+        ) !== meta
       ) {
-        return `A carga cadastrada de ${turma.nome} não é 30.`;
+        return `A carga cadastrada de ${turma.nome} não é ${meta}.`;
       }
     }
+
 
     // Confere cada participante da aula compartilhada.
     for (const professor of professores) {
@@ -402,7 +427,7 @@ function validarGrade(dados, verificarCompletude = false) {
 
         for (const dia of DIAS_GRADE) {
           for (const periodo of ["regular", "contraturno"]) {
-            const slots = posicoes.filter(pos =>
+            const slots = posicoesTurmaGrade(turma).filter(pos =>
               pos.startsWith(`${dia.id}:${periodo}:`)
             );
 
@@ -691,6 +716,13 @@ function corDisciplinaGrade(disciplina) {
 
 function criarCelulaGradeConsolidada(turma, posicao) {
   const td = document.createElement("td");
+  
+  if (!posicoesTurmaGrade(turma).includes(posicao)) {
+    td.className = "celula-aula sem-posicao";
+    td.textContent = "—";
+    return td;
+  }
+
   const chave = chaveCelula(turma.id, posicao);
   const atribuicao = grade[chave];
 
@@ -801,6 +833,7 @@ function criarTabelaGeral(periodo, dias, quantidade) {
   return wrapper;
 }
 
+
 function renderizarGrade() {
   const container = gh("grade-escolar");
   const resumo = gh("resumo-grade");
@@ -808,62 +841,75 @@ function renderizarGrade() {
   container.replaceChildren();
   resumo.replaceChildren();
 
-  const posicoes = posicoesGrade();
-  let totalPreenchido = 0;
+  const totalNecessario = turmas.reduce(
+    (soma, turma) =>
+      soma + cargaSemanalTurma(turma),
+    0
+  );
 
-  turmas.forEach(turma => {
-    totalPreenchido += posicoes.filter(pos =>
-      !!grade[chaveCelula(turma.id, pos)]
-    ).length;
-  });
+  const totalPreenchido = turmas.reduce(
+    (soma, turma) =>
+      soma + posicoesTurmaGrade(turma).filter(pos =>
+        !!grade[chaveCelula(turma.id, pos)]
+      ).length,
+    0
+  );
 
   if (turmas.length) {
-    const configuracao = configGrade();
+    const config = configGrade();
 
+    // TURNO REGULAR
     const principal = document.createElement("article");
     principal.className =
       "bloco-horario bloco-grade-geral";
 
     principal.appendChild(
-      elementoGrade("h3", "Grade geral — turno regular")
+      elementoGrade(
+        "h3",
+        "Grade geral — turno regular"
+      )
     );
 
     principal.appendChild(
       criarTabelaGeral(
         "regular",
         DIAS_GRADE,
-        configuracao.aulas
+        config.aulas
       )
     );
 
     container.appendChild(principal);
 
-    if (configuracao.aulas === 5) {
-      const diaCT = DIAS_GRADE.find(
-        d => d.id === configuracao.contraturno
+    // CONTRATURNOS INDIVIDUAIS
+    if (config.aulas === 5) {
+      const diasCT = DIAS_GRADE.filter(dia =>
+        turmas.some(turma =>
+          cargaSemanalTurma(turma) === 30 &&
+          contraturnoTurma(turma) === dia.id
+        )
       );
 
-      if (diaCT) {
-        const segundo = document.createElement("article");
-        segundo.className =
+      if (diasCT.length) {
+        const tarde = document.createElement("article");
+        tarde.className =
           "bloco-horario bloco-grade-geral";
 
-        segundo.appendChild(
+        tarde.appendChild(
           elementoGrade(
             "h3",
-            `Contraturno — ${diaCT.nome}`
+            "Grade geral — contraturnos"
           )
         );
 
-        segundo.appendChild(
+        tarde.appendChild(
           criarTabelaGeral(
             "contraturno",
-            [diaCT],
+            diasCT,
             5
           )
         );
 
-        container.appendChild(segundo);
+        container.appendChild(tarde);
       }
     }
   } else {
@@ -876,17 +922,17 @@ function renderizarGrade() {
     );
   }
 
-  const totalNecessario = turmas.length * 30;
-
   const div = document.createElement("div");
   div.className = "resumo-horarios";
 
   div.append(
     elementoGrade(
-      "span", `${turmas.length} turma(s)`
+      "span",
+      `${turmas.length} turma(s)`
     ),
     elementoGrade(
-      "span", `${totalPreenchido}/${totalNecessario} aulas`
+      "span",
+      `${totalPreenchido}/${totalNecessario} aulas`
     ),
     elementoGrade(
       "span",
@@ -913,11 +959,13 @@ function renderizarGrade() {
     const erroFinal = validarGrade(grade, true);
 
     mensagemGrade(
-      erroFinal || "Todas as 30 aulas estão distribuídas!",
+      erroFinal ||
+        `Todas as ${totalNecessario} aulas estão distribuídas!`,
       !!erroFinal
     );
   }
 }
+
 
 
 gh("atualizar-grade").addEventListener("click", () => {

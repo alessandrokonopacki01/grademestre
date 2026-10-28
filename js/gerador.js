@@ -1,6 +1,7 @@
 
 const botaoGerar = document.getElementById("gerar-grade");
 const statusGerador = document.getElementById("status-gerador");
+
 const URL_API = "https://grademestre.onrender.com";
 
 const painelDiagnostico = document.getElementById(
@@ -11,15 +12,29 @@ const listaDiagnosticos = document.getElementById(
   "lista-diagnosticos"
 );
 
+// ==========================================
+// DIAGNÓSTICO INTELIGENTE
+// ==========================================
+
 function limparDiagnostico() {
-  painelDiagnostico.hidden = true;
-  listaDiagnosticos.replaceChildren();
+  if (painelDiagnostico) {
+    painelDiagnostico.hidden = true;
+  }
+
+  if (listaDiagnosticos) {
+    listaDiagnosticos.replaceChildren();
+  }
 }
 
 function mostrarDiagnostico(problemas) {
   limparDiagnostico();
 
-  if (!Array.isArray(problemas) || !problemas.length) {
+  if (
+    !Array.isArray(problemas) ||
+    !problemas.length ||
+    !painelDiagnostico ||
+    !listaDiagnosticos
+  ) {
     return;
   }
 
@@ -36,6 +51,7 @@ function mostrarDiagnostico(problemas) {
     detalhe.textContent = problema.detalhe || "";
 
     const etiqueta = document.createElement("strong");
+
     etiqueta.textContent =
       problema.tipo === "comprovado"
         ? "Impossibilidade comprovada"
@@ -49,7 +65,13 @@ function mostrarDiagnostico(problemas) {
       lista.appendChild(item);
     });
 
-    card.append(titulo, etiqueta, detalhe, lista);
+    card.append(
+      titulo,
+      etiqueta,
+      detalhe,
+      lista
+    );
+
     listaDiagnosticos.appendChild(card);
   });
 
@@ -59,155 +81,322 @@ function mostrarDiagnostico(problemas) {
   });
 }
 
+// ==========================================
+// VALIDAR CONFIGURAÇÃO DAS TURMAS
+// ==========================================
 
-botaoGerar.addEventListener("click", async () => {
-  const endereco = URL_API;
-
-  if (!turmas.length || !professores.length) {
-    statusGerador.textContent =
-      "Cadastre turmas e professores antes de gerar.";
-    return;
+function validarTurmasParaGeracao() {
+  if (!turmas.length) {
+    return "Cadastre pelo menos uma turma.";
   }
 
+  if (!professores.length) {
+    return "Cadastre pelo menos um professor.";
+  }
+
+  const modelo = aulasRegularesPorDia();
+
+  const diasValidos = [
+    "segunda",
+    "terca",
+    "quarta",
+    "quinta",
+    "sexta"
+  ];
+
   for (const turma of turmas) {
+    const carga = cargaSemanalTurma(turma);
+
+    if (modelo === 6 && carga !== 30) {
+      return (
+        `A turma ${turma.nome} está incompatível ` +
+        "com o modelo de seis aulas por dia."
+      );
+    }
+
+    if (modelo === 5 && ![25, 30].includes(carga)) {
+      return (
+        `A turma ${turma.nome} possui uma carga ` +
+        "semanal inválida."
+      );
+    }
+
+    if (
+      turmaTemContraturno(turma) &&
+      !diasValidos.includes(contraturnoTurma(turma))
+    ) {
+      return (
+        `Confira o dia do contraturno ` +
+        `da turma ${turma.nome}.`
+      );
+    }
+
     const situacao = calcularSituacaoTurma(turma);
 
     if (!situacao.completa) {
-      statusGerador.textContent =
+      return (
         `A turma ${turma.nome} possui ` +
-        `${situacao.total}/30 aulas cadastradas.`;
-      return;
+        `${situacao.total}/${situacao.meta} ` +
+        "aulas cadastradas."
+      );
     }
-  }
 
-  // VALIDAR DOCÊNCIA COMPARTILHADA
+    // Verifica grupos compartilhados antes
+    // de enviar a requisição ao backend.
 
-  for (const turma of turmas) {
     const opcoes = opcoesTurma(turma);
 
     for (const op of opcoes) {
       const problema = validarOpcaoCompartilhada(op);
 
       if (problema) {
-        statusGerador.textContent =
-          `Docência compartilhada — ${turma.nome}: ${problema}`;
-        return;
+        return (
+          `Docência compartilhada — ${turma.nome}: ` +
+          problema
+        );
       }
     }
   }
 
+  return null;
+}
 
-  const preservar = document.getElementById(
+// ==========================================
+// CALCULAR TOTAL DE AULAS DA ESCOLA
+// ==========================================
+
+function totalAulasEsperadas() {
+  return turmas.reduce(
+    (soma, turma) =>
+      soma + cargaSemanalTurma(turma),
+    0
+  );
+}
+
+// ==========================================
+// GERADOR AUTOMÁTICO
+// ==========================================
+
+botaoGerar.addEventListener("click", async () => {
+  const erroCadastro = validarTurmasParaGeracao();
+
+  if (erroCadastro) {
+    statusGerador.textContent = erroCadastro;
+    return;
+  }
+
+  const campoPreservar = document.getElementById(
     "preservar-aulas"
-  ).checked;
+  );
+
+  const preservar = Boolean(campoPreservar?.checked);
+
+  // Não permite preservar aulas quando os
+  // cadastros foram modificados.
 
   if (preservar && gradeDesatualizada()) {
-  statusGerador.textContent =
-    "Os cadastros foram alterados. " +
-    "Desmarque 'Preservar aulas já preenchidas' " +
-    "para gerar novamente.";
+    statusGerador.textContent =
+      "Os cadastros foram alterados. " +
+      "Desmarque 'Preservar aulas já preenchidas' " +
+      "para gerar novamente.";
 
-  return;
-}
+    return;
+  }
+
+  // Validação das aulas já posicionadas.
 
   if (preservar) {
     const erroAtual = validarGrade(grade);
 
     if (erroAtual) {
       statusGerador.textContent =
-        "A grade atual possui conflitos: " + erroAtual;
+        "A grade atual possui conflitos: " +
+        erroAtual;
+
       return;
     }
   }
 
+  // ========================================
+  // PREPARAR DADOS PARA O PYTHON
+  // ========================================
+
+  const configuracao = configuracaoEscolarTurmas();
+
   const dados = {
     config: {
-      modelo: String(configGrade().aulas),
-      contraturno: configGrade().contraturno
+      modelo: String(configuracao.modelo),
+      contraturno: configuracao.contraturno
     },
-    turmas,
+
+    turmas: turmas.map(turma => ({
+      ...turma,
+      aulasSemanais: cargaSemanalTurma(turma),
+      diaContraturno: turmaTemContraturno(turma)
+        ? contraturnoTurma(turma)
+        : null
+    })),
+
     professores,
+
     fixadas: preservar ? { ...grade } : {}
   };
 
- limparDiagnostico();
+  const totalEsperado = totalAulasEsperadas();
+
+  limparDiagnostico();
+
   botaoGerar.disabled = true;
   botaoGerar.textContent = "Calculando...";
+
   statusGerador.textContent =
-    "Procurando uma distribuição válida...";
+    `Procurando uma distribuição válida ` +
+    `para ${totalEsperado} aulas...`;
+
+  // ========================================
+  // COMUNICAÇÃO COM A API
+  // ========================================
 
   const controlador = new AbortController();
-  const limite = setTimeout(() => controlador.abort(), 90000);
+
+  const limite = setTimeout(
+    () => controlador.abort(),
+    90000
+  );
 
   try {
-    const resposta = await fetch(`${endereco}/gerar`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(dados),
-      signal: controlador.signal
-    });
+    const resposta = await fetch(
+      `${URL_API}/gerar`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(dados),
+        signal: controlador.signal
+      }
+    );
 
     let resultado;
 
     try {
       resultado = await resposta.json();
     } catch {
-      throw new Error("A API não retornou JSON válido.");
+      throw new Error(
+        "A API não retornou JSON válido."
+      );
     }
+
+    // ======================================
+    // ERROS DO SERVIDOR
+    // ======================================
 
     if (!resposta.ok) {
+      let mensagem = `Erro HTTP ${resposta.status}`;
+
+      if (typeof resultado.detail === "string") {
+        mensagem = resultado.detail;
+      } else if (Array.isArray(resultado.detail)) {
+        mensagem = resultado.detail
+          .map(item => item.msg || "Erro de validação")
+          .join("; ");
+      }
+
+      throw new Error(mensagem);
+    }
+
+    // ======================================
+    // DIAGNÓSTICO DE INVIABILIDADE
+    // ======================================
+
+    if (!resultado.sucesso) {
+      statusGerador.textContent =
+        resultado.mensagem ||
+        "Não foi possível gerar os horários.";
+
+      if (resultado.situacao === "inviavel") {
+        mostrarDiagnostico(
+          resultado.diagnostico
+        );
+      } else if (
+        resultado.situacao === "limite_ou_erro"
+      ) {
+        statusGerador.textContent +=
+          " Tente novamente ou revise as restrições. " +
+          "A impossibilidade não foi comprovada.";
+      }
+
+      return;
+    }
+
+    // ======================================
+    // VALIDAR RESULTADO DA API
+    // ======================================
+
+    if (
+      !resultado.grade ||
+      typeof resultado.grade !== "object" ||
+      Array.isArray(resultado.grade)
+    ) {
       throw new Error(
-        typeof resultado.detail === "string"
-          ? resultado.detail
-          : `Erro HTTP ${resposta.status}`
+        "A API retornou uma grade inválida."
       );
     }
 
-    
-if (!resultado.sucesso) {
-  statusGerador.textContent =
-    resultado.mensagem || "Não foi possível gerar.";
+    const totalRecebido = Object.keys(
+      resultado.grade
+    ).length;
 
-  if (resultado.situacao === "inviavel") {
-    mostrarDiagnostico(resultado.diagnostico);
-  } else if (resultado.situacao === "limite_ou_erro") {
-    statusGerador.textContent +=
-      " Tente novamente ou revise as restrições. " +
-      "A impossibilidade não foi comprovada.";
-  }
-
-  return;
-}
-
-
-    const erro = validarGrade(resultado.grade, true);
-
-    if (erro) {
+    if (totalRecebido !== totalEsperado) {
       throw new Error(
-        "O resultado recebido não passou na validação: " + erro
+        `O servidor retornou ${totalRecebido} ` +
+        `aulas, mas eram esperadas ` +
+        `${totalEsperado}.`
       );
     }
 
-    // Só substituímos os horários depois da validação.
+    // O horarios.js deverá validar
+    // individualmente as posições de cada turma.
+
+    const erroGrade = validarGrade(
+      resultado.grade,
+      true
+    );
+
+    if (erroGrade) {
+      throw new Error(
+        "O resultado recebido não passou " +
+        "na validação: " + erroGrade
+      );
+    }
+
+    // ======================================
+    // SALVAR SOMENTE APÓS VALIDAR
+    // ======================================
+
     salvarGrade(resultado.grade);
+
     selecaoGrade = null;
+
     renderizarGrade();
 
     statusGerador.textContent =
-      `Horários gerados: ${resultado.totalAulas} aulas ` +
-      `distribuídas sem conflitos.`;
+      `Horários gerados: ${totalRecebido} ` +
+      `aulas distribuídas sem conflitos detectados.`;
 
   } catch (erro) {
-    statusGerador.textContent = erro.name === "AbortError"
-      ? "A requisição excedeu o tempo limite."
-      : `Falha na geração: ${erro.message}`;
+    statusGerador.textContent =
+      erro.name === "AbortError"
+        ? "A requisição excedeu o tempo limite."
+        : `Falha na geração: ${erro.message}`;
 
     console.error(erro);
+
   } finally {
     clearTimeout(limite);
+
     botaoGerar.disabled = false;
+
     botaoGerar.textContent =
       "Gerar horários automaticamente";
   }
