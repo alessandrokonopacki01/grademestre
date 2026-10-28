@@ -152,6 +152,7 @@ function criarGradeIndisponibilidade(marcados = []) {
   container.appendChild(tabela);
 }
 
+
 function criarCampo(rotulo, tipo, classe, valor, min, max) {
   const grupo = document.createElement("div");
   const label = document.createElement("label");
@@ -161,7 +162,9 @@ function criarCampo(rotulo, tipo, classe, valor, min, max) {
   input.type = tipo;
   input.className = classe;
   input.value = valor;
-  input.required = true;
+
+  // Somente o grupo compartilhado é opcional.
+  input.required = classe !== "vinculo-compartilhado";
 
   if (tipo === "number") {
     input.min = min;
@@ -172,6 +175,7 @@ function criarCampo(rotulo, tipo, classe, valor, min, max) {
   grupo.append(label, input);
   return grupo;
 }
+
 
 function adicionarVinculo(dados = {}) {
   const linha = document.createElement("div");
