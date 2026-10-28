@@ -259,6 +259,20 @@ const modoInicial = dados.geminadas ||
   );
 
   linha.appendChild(grupoPares);
+  
+  // DOCÊNCIA COMPARTILHADA
+
+  const grupoCompartilhado = criarCampo(
+    "Grupo compartilhado (opcional)",
+    "text",
+    "vinculo-compartilhado",
+    dados.grupoCompartilhado || "",
+    null,
+    null
+  );
+
+  linha.appendChild(grupoCompartilhado);
+
 
   const campoAulas = linha.querySelector(".vinculo-aulas");
   const campoPares = grupoPares.querySelector("input");
@@ -354,6 +368,9 @@ function coletarVinculos() {
       disciplina: linha.querySelector(".vinculo-disciplina").value.trim(),
       aulas: Number(linha.querySelector(".vinculo-aulas").value),
       maxDia: Number(linha.querySelector(".vinculo-max").value),
+      grupoCompartilhado: linha
+  .querySelector(".vinculo-compartilhado")
+  .value.trim(),
       geminadas,
       paresGeminados: geminadas === "obrigatoria"
         ? Number(linha.querySelector(".vinculo-pares").value)
@@ -499,6 +516,9 @@ function renderizarProfessores() {
 
     
 professor.vinculos.forEach(v => {
+  const detalheCompartilhado = v.grupoCompartilhado
+  ? ` • Compartilhada: ${v.grupoCompartilhado}`
+  : "";
   const detalheGeminadas = v.geminadas === "obrigatoria"
     ? ` • ${v.paresGeminados} par(es) obrigatório(s)`
     : " • Aulas livres";
@@ -508,7 +528,7 @@ professor.vinculos.forEach(v => {
       "p",
       `${v.turma} — ${v.disciplina}: ${v.aulas} aulas/semana ` +
       `(máx. ${v.maxDia}/dia)` +
-      detalheGeminadas
+      detalheGeminadas + detalheCompartilhado
     )
   );
 });
