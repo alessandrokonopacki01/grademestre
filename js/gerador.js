@@ -80,6 +80,23 @@ botaoGerar.addEventListener("click", async () => {
     }
   }
 
+  // VALIDAR DOCÊNCIA COMPARTILHADA
+
+  for (const turma of turmas) {
+    const opcoes = opcoesTurma(turma);
+
+    for (const op of opcoes) {
+      const problema = validarOpcaoCompartilhada(op);
+
+      if (problema) {
+        statusGerador.textContent =
+          `Docência compartilhada — ${turma.nome}: ${problema}`;
+        return;
+      }
+    }
+  }
+
+
   const preservar = document.getElementById(
     "preservar-aulas"
   ).checked;
