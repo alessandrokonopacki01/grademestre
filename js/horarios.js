@@ -677,108 +677,125 @@ function selecionarCelula(chave, elemento) {
   }
 }
 
-function criarTabelaHorario(turma, periodo, quantidade) {
+
+function corDisciplinaGrade(disciplina) {
+  const nome = nomeNormalizado(disciplina);
+  let codigo = 0;
+
+  for (const letra of nome) {
+    codigo = (codigo * 31 + letra.charCodeAt(0)) % 360;
+  }
+
+  return `hsl(${codigo}, 73%, 85%)`;
+}
+
+function criarCelulaGradeConsolidada(turma, posicao) {
+  const td = document.createElement("td");
+  const chave = chaveCelula(turma.id, posicao);
+  const atribuicao = grade[chave];
+
+  td.className = atribuicao
+    ? "celula-aula preenchida"
+    : "celula-aula vazia";
+
+  if (atribuicao) {
+    const referencia = encontrarVinculo(turma, atribuicao);
+
+    if (referencia) {
+      td.style.backgroundColor =
+        corDisciplinaGrade(atribuicao.disciplina);
+      td.style.color = "#222";
+
+      td.append(
+        elementoGrade("strong", atribuicao.disciplina),
+        elementoGrade("small", referencia.professor)
+      );
+    } else {
+      td.classList.add("invalida");
+      td.textContent = "Vínculo inválido";
+    }
+  } else {
+    td.textContent = "+ Adicionar";
+  }
+
+  td.tabIndex = 0;
+  td.setAttribute("role", "button");
+  td.setAttribute("aria-label", `${turma.nome}, ${posicao}`);
+
+  td.addEventListener("click", () => {
+    selecionarCelula(chave, td);
+  });
+
+  td.addEventListener("keydown", evento => {
+    if (evento.key === "Enter" || evento.key === " ") {
+      evento.preventDefault();
+      selecionarCelula(chave, td);
+    }
+  });
+
+  return td;
+}
+
+function criarTabelaGeral(periodo, dias, quantidade) {
   const tabela = document.createElement("table");
-  tabela.className = "tabela-horarios";
+  tabela.className =
+    "tabela-horarios tabela-horarios-geral";
 
   const thead = document.createElement("thead");
   const cabecalho = document.createElement("tr");
 
-  ["Aula", ...DIAS_GRADE.map(d => d.nome)].forEach(nome => {
-    cabecalho.appendChild(elementoGrade("th", nome));
+  cabecalho.appendChild(elementoGrade("th", "Dia"));
+  cabecalho.appendChild(elementoGrade("th", "Aula"));
+
+  turmas.forEach(turma => {
+    cabecalho.appendChild(
+      elementoGrade("th", turma.nome)
+    );
   });
 
   thead.appendChild(cabecalho);
   tabela.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  const config = configGrade();
 
-  for (let aula = 1; aula <= quantidade; aula++) {
-    const tr = document.createElement("tr");
+  dias.forEach(dia => {
+    for (let n = 1; n <= quantidade; n++) {
+      const tr = document.createElement("tr");
 
-    tr.appendChild(
-      elementoGrade("th", `${aula}ª aula`)
-    );
-
-    DIAS_GRADE.forEach(dia => {
-      const td = document.createElement("td");
-
-      const posicao = `${dia.id}:${periodo}:${aula}`;
-      const existe =
-        periodo === "regular" ||
-        dia.id === config.contraturno;
-
-      if (!existe) {
-        td.className = "celula-aula sem-posicao";
-        td.textContent = "—";
-      } else {
-        const chave = chaveCelula(turma.id, posicao);
-        const atribuicao = grade[chave];
-
-        td.className = atribuicao
-          ? "celula-aula preenchida"
-          : "celula-aula vazia";
-
-        if (atribuicao) {
-          const referencia = encontrarVinculo(
-            turma,
-            atribuicao
-          );
-
-          if (referencia) {
-            td.append(
-              elementoGrade(
-                "strong",
-                atribuicao.disciplina
-              ),
-              elementoGrade(
-                "small",
-                referencia.professor
-              )
-            );
-          } else {
-            td.classList.add("invalida");
-            td.textContent = "Vínculo inválido";
-          }
-        } else {
-          td.textContent = "+ Adicionar";
-        }
-
-        td.tabIndex = 0;
-        td.setAttribute("role", "button");
-
-        td.setAttribute(
-          "aria-label",
-          `${turma.nome}, ${dia.nome}, ` +
-          `${periodo}, aula ${aula}`
+      if (n === 1) {
+        const celulaDia = elementoGrade(
+          "th", dia.nome, "dia-grade"
         );
-
-        td.addEventListener("click", () => {
-          selecionarCelula(chave, td);
-        });
-
-        td.addEventListener("keydown", evento => {
-          if (
-            evento.key === "Enter" ||
-            evento.key === " "
-          ) {
-            evento.preventDefault();
-            selecionarCelula(chave, td);
-          }
-        });
+        celulaDia.rowSpan = quantidade;
+        celulaDia.scope = "rowgroup";
+        tr.appendChild(celulaDia);
       }
 
-      tr.appendChild(td);
-    });
+      tr.appendChild(
+        elementoGrade("th", `${n}ª`, "numero-aula-grade")
+      );
 
-    tbody.appendChild(tr);
-  }
+      const posicao = `${dia.id}:${periodo}:${n}`;
+
+      turmas.forEach(turma => {
+        tr.appendChild(
+          criarCelulaGradeConsolidada(turma, posicao)
+        );
+      });
+
+      if (n === 1) {
+        tr.classList.add("inicio-dia-grade");
+      }
+
+      tbody.appendChild(tr);
+    }
+  });
 
   tabela.appendChild(tbody);
 
   const wrapper = document.createElement("div");
-  wrapper.className = "grade-wrapper";
+  wrapper.className =
+    "grade-wrapper grade-wrapper-geral";
   wrapper.appendChild(tabela);
 
   return wrapper;
@@ -798,72 +815,58 @@ function renderizarGrade() {
     totalPreenchido += posicoes.filter(pos =>
       !!grade[chaveCelula(turma.id, pos)]
     ).length;
+  });
 
-    const bloco = document.createElement("article");
-    bloco.className = "bloco-horario";
+  if (turmas.length) {
+    const configuracao = configGrade();
 
-    bloco.appendChild(
-      elementoGrade("h3", turma.nome)
+    const principal = document.createElement("article");
+    principal.className =
+      "bloco-horario bloco-grade-geral";
+
+    principal.appendChild(
+      elementoGrade("h3", "Grade geral — turno regular")
     );
 
-    const config = configGrade();
-
-    bloco.appendChild(
-      criarTabelaHorario(
-        turma,
+    principal.appendChild(
+      criarTabelaGeral(
         "regular",
-        config.aulas
+        DIAS_GRADE,
+        configuracao.aulas
       )
     );
 
-    if (config.aulas === 5) {
-      const dia = DIAS_GRADE.find(
-        d => d.id === config.contraturno
+    container.appendChild(principal);
+
+    if (configuracao.aulas === 5) {
+      const diaCT = DIAS_GRADE.find(
+        d => d.id === configuracao.contraturno
       );
 
-      bloco.appendChild(
-        elementoGrade(
-          "div",
-          `Contraturno — ${dia?.nome || config.contraturno}`,
-          "titulo-contraturno"
-        )
-      );
+      if (diaCT) {
+        const segundo = document.createElement("article");
+        segundo.className =
+          "bloco-horario bloco-grade-geral";
 
-      bloco.appendChild(
-        criarTabelaHorario(
-          turma,
-          "contraturno",
-          5
-        )
-      );
+        segundo.appendChild(
+          elementoGrade(
+            "h3",
+            `Contraturno — ${diaCT.nome}`
+          )
+        );
+
+        segundo.appendChild(
+          criarTabelaGeral(
+            "contraturno",
+            [diaCT],
+            5
+          )
+        );
+
+        container.appendChild(segundo);
+      }
     }
-
-    container.appendChild(bloco);
-  });
-
-  const totalNecessario = turmas.length * 30;
-
-  const div = document.createElement("div");
-  div.className = "resumo-horarios";
-
-  div.append(
-    elementoGrade(
-      "span",
-      `${turmas.length} turma(s)`
-    ),
-    elementoGrade(
-      "span",
-      `${totalPreenchido}/${totalNecessario} aulas`
-    ),
-    elementoGrade(
-      "span",
-      `${totalNecessario - totalPreenchido} posições vazias`
-    )
-  );
-
-  resumo.appendChild(div);
-
-  if (!turmas.length) {
+  } else {
     container.appendChild(
       elementoGrade(
         "div",
@@ -872,6 +875,26 @@ function renderizarGrade() {
       )
     );
   }
+
+  const totalNecessario = turmas.length * 30;
+
+  const div = document.createElement("div");
+  div.className = "resumo-horarios";
+
+  div.append(
+    elementoGrade(
+      "span", `${turmas.length} turma(s)`
+    ),
+    elementoGrade(
+      "span", `${totalPreenchido}/${totalNecessario} aulas`
+    ),
+    elementoGrade(
+      "span",
+      `${totalNecessario - totalPreenchido} posições vazias`
+    )
+  );
+
+  resumo.appendChild(div);
 
   const erro = validarGrade(grade);
 
@@ -887,18 +910,15 @@ function renderizarGrade() {
       true
     );
   } else if (turmas.length) {
-    const erroFinal = validarGrade(
-      grade,
-      true
-    );
+    const erroFinal = validarGrade(grade, true);
 
     mensagemGrade(
-      erroFinal ||
-        "Todas as 30 aulas estão distribuídas!",
+      erroFinal || "Todas as 30 aulas estão distribuídas!",
       !!erroFinal
     );
   }
 }
+
 
 gh("atualizar-grade").addEventListener("click", () => {
   selecaoGrade = null;

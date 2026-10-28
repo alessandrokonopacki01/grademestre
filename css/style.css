@@ -1148,3 +1148,121 @@ textarea:focus {
         grid-template-columns: 1fr;
     }
 }
+
+/* GRADE GERAL — FORMATO DO COLÉGIO */
+
+.grade-wrapper-geral {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.tabela-horarios-geral {
+  width: 100%;
+  min-width: 1050px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.tabela-horarios-geral th,
+.tabela-horarios-geral td {
+  border: 1px solid #9ca3af;
+  padding: 6px 4px;
+  text-align: center;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.tabela-horarios-geral thead th {
+  background: #171717;
+  color: #d4af37;
+  font-weight: 700;
+}
+
+.tabela-horarios-geral .dia-grade {
+  background: #e5e7eb;
+  color: #111827;
+  width: 75px;
+  font-weight: 700;
+}
+
+.tabela-horarios-geral .numero-aula-grade {
+  background: #f3f4f6;
+  color: #111827;
+  width: 48px;
+}
+
+.tabela-horarios-geral .celula-aula {
+  height: 62px;
+  cursor: pointer;
+}
+
+.tabela-horarios-geral .celula-aula strong {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.tabela-horarios-geral .celula-aula small {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.tabela-horarios-geral .inicio-dia-grade td,
+.tabela-horarios-geral .inicio-dia-grade th {
+  border-top: 3px solid #111827;
+}
+
+.tabela-horarios-geral .celula-aula.selecionada {
+  outline: 3px solid #b8860b;
+  outline-offset: -3px;
+}
+
+/* IMPRESSÃO */
+
+@media print {
+  @page {
+    size: A3 landscape;
+    margin: 8mm;
+  }
+
+  .grade-wrapper-geral {
+    overflow: visible !important;
+  }
+
+  .tabela-horarios-geral {
+    min-width: 0;
+    width: 100%;
+    font-size: 8px;
+  }
+
+  .tabela-horarios-geral .celula-aula {
+    height: auto;
+    padding: 3px 2px;
+  }
+
+  .tabela-horarios-geral .celula-aula strong {
+    font-size: 8px;
+  }
+
+  .tabela-horarios-geral .celula-aula small {
+    font-size: 7px;
+  }
+
+  .tabela-horarios-geral td,
+  .tabela-horarios-geral th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .bloco-grade-geral {
+    break-inside: auto;
+    box-shadow: none;
+  }
+
+  .tabela-horarios-geral tr {
+    break-inside: avoid;
+  }
+}
