@@ -1,17 +1,14 @@
 
 const CHAVE_GRADE = "grademestre_grade_v1";
-
 const CHAVE_REVISAO_GRADE = "grademestre_grade_revisao_v1";
 
 function assinaturaCadastros() {
   const config = JSON.parse(
     localStorage.getItem("grademestre_config") || "{}"
   );
-
   const turmasSalvas = JSON.parse(
     localStorage.getItem("grademestre_turmas") || "[]"
   );
-
   const professoresSalvos = JSON.parse(
     localStorage.getItem("grademestre_professores") || "[]"
   );
@@ -25,7 +22,6 @@ function assinaturaCadastros() {
 
 function gradeDesatualizada() {
   if (Object.keys(grade).length === 0) return false;
-
   return localStorage.getItem(CHAVE_REVISAO_GRADE) !==
     assinaturaCadastros();
 }
@@ -33,7 +29,6 @@ function gradeDesatualizada() {
 function avisarGradeDesatualizada() {
   renderizarGrade();
 }
-
 
 const DIAS_GRADE = [
   { id: "segunda", nome: "Segunda" },
@@ -60,21 +55,14 @@ function carregarGrade() {
   }
 }
 
-
 function salvarGrade(dados) {
-  localStorage.setItem(
-    CHAVE_GRADE,
-    JSON.stringify(dados)
-  );
-
+  localStorage.setItem(CHAVE_GRADE, JSON.stringify(dados));
   localStorage.setItem(
     CHAVE_REVISAO_GRADE,
     assinaturaCadastros()
   );
-
   grade = dados;
 }
-
 
 function configGrade() {
   let c = {};
@@ -128,55 +116,156 @@ function dadosCelula(chave) {
   };
 }
 
-function encontrarVinculo(turma, atribuicao) {
-  if (!turma || !atribuicao) return null;
-
-  const professor = professores.find(
-    p => p.id === atribuicao.professorId
-  );
-
-  if (!professor) return null;
-
-  const vinculo = professor.vinculos.find(v =>
-    nomeNormalizado(v.turma) === nomeNormalizado(turma.nome) &&
-    nomeNormalizado(v.disciplina) ===
-      nomeNormalizado(atribuicao.disciplina)
-  );
-
-  if (!vinculo) return null;
-
-  return { professor, vinculo };
-}
-
+// Uma opção representa uma aula individual ou compartilhada.
 function opcoesTurma(turma) {
-  const resultado = [];
+  const opcoes = [];
+  const grupos = new Map();
+  const turmaNome = nomeNormalizado(turma.nome);
 
   professores.forEach(professor => {
-    professor.vinculos.forEach(v => {
-      if (nomeNormalizado(v.turma) ===
-          nomeNormalizado(turma.nome)) {
-        resultado.push({
+    (professor.vinculos || []).forEach(vinculo => {
+      if (nomeNormalizado(vinculo.turma) !== turmaNome) return;
+
+      const grupo = nomeNormalizado(vinculo.grupoCompartilhado);
+      const membro = { professor, vinculo };
+
+      if (!grupo) {
+        opcoes.push({
           professorId: professor.id,
+          professoresIds: [professor.id],
+          professores: [membro],
           professor: professor.nome,
-          disciplina: v.disciplina
+          disciplina: vinculo.disciplina,
+          grupoCompartilhado: ""
+        });
+        return;
+      }
+
+      const chave = `${turmaNome}|${grupo}`;
+
+      if (!grupos.has(chave)) {
+        grupos.set(chave, {
+          professorId: professor.id,
+          professoresIds: [],
+          professores: [],
+          professor: "",
+          disciplina: vinculo.disciplina,
+          grupoCompartilhado:
+            String(vinculo.grupoCompartilhado).trim()
         });
       }
+
+      const op = grupos.get(chave);
+      op.professores.push(membro);
+      op.professoresIds.push(professor.id);
     });
   });
 
-  return resultado.sort((a, b) =>
+  grupos.forEach(op => {
+    op.professor = op.professores
+      .map(m => m.professor.nome)
+      .join(" + ");
+    opcoes.push(op);
+  });
+
+  return opcoes.sort((a, b) =>
     a.disciplina.localeCompare(b.disciplina, "pt-BR")
   );
 }
 
-// Valida a grade inteira, não apenas a célula editada.
+function validarOpcaoCompartilhada(op) {
+  if (!op.grupoCompartilhado) return null;
+
+  if (op.professores.length < 2) {
+    return `O grupo ${op.grupoCompartilhado} precisa de dois professores.`;
+  }
+
+  const ids = op.professoresIds;
+
+  if (new Set(ids).size !== ids.length) {
+    return `Professor repetido no grupo ${op.grupoCompartilhado}.`;
+  }
+
+  const referencia = op.professores[0].vinculo;
+
+  for (const membro of op.professores.slice(1)) {
+    const v = membro.vinculo;
+
+    if (
+      nomeNormalizado(v.disciplina) !==
+        nomeNormalizado(referencia.disciplina) ||
+      Number(v.aulas) !== Number(referencia.aulas) ||
+      (v.geminadas || "livre") !==
+        (referencia.geminadas || "livre") ||
+      Number(v.paresGeminados || 0) !==
+        Number(referencia.paresGeminados || 0)
+    ) {
+      return `Os participantes de ${op.grupoCompartilhado} devem ter ` +
+        `disciplina, carga e geminadas iguais.`;
+    }
+  }
+
+  return null;
+}
+
+function encontrarVinculo(turma, atribuicao) {
+  if (!turma || !atribuicao) return null;
+
+  const idsRecebidos = Array.isArray(atribuicao.professoresIds)
+    ? atribuicao.professoresIds
+    : [atribuicao.professorId];
+
+  if (
+    !idsRecebidos.length ||
+    new Set(idsRecebidos).size !== idsRecebidos.length
+  ) {
+    return null;
+  }
+
+  const opcoes = opcoesTurma(turma);
+
+  const op = opcoes.find(opcao => {
+    if (
+      nomeNormalizado(opcao.disciplina) !==
+      nomeNormalizado(atribuicao.disciplina)
+    ) return false;
+
+    if (opcao.professoresIds.length !== idsRecebidos.length) {
+      return false;
+    }
+
+    if (!opcao.professoresIds.every(id =>
+      idsRecebidos.includes(id)
+    )) return false;
+
+    if (
+      atribuicao.grupoCompartilhado !== undefined &&
+      nomeNormalizado(atribuicao.grupoCompartilhado) !==
+        nomeNormalizado(opcao.grupoCompartilhado)
+    ) return false;
+
+    return true;
+  });
+
+  if (!op || validarOpcaoCompartilhada(op)) return null;
+  return op;
+}
+
+// Valida a grade inteira.
 function validarGrade(dados, verificarCompletude = false) {
-  const config = configGrade();
-  const posicoes = new Set(posicoesGrade());
-  const ocupacoes = new Map();
+  const posicoes = posicoesGrade();
+  const conjuntoPosicoes = new Set(posicoes);
+  const ocupacoes = new Set();
   const totais = new Map();
   const diarios = new Map();
   const diariosVinculo = new Map();
+
+  for (const turma of turmas) {
+    for (const op of opcoesTurma(turma)) {
+      const problema = validarOpcaoCompartilhada(op);
+      if (problema) return problema;
+    }
+  }
 
   for (const [chave, atribuicao] of Object.entries(dados)) {
     if (!atribuicao) continue;
@@ -188,67 +277,75 @@ function validarGrade(dados, verificarCompletude = false) {
     const { turmaId, posicao } = dadosCelula(chave);
     const turma = turmas.find(t => t.id === turmaId);
 
-    if (!turma || !posicoes.has(posicao)) {
+    if (!turma || !conjuntoPosicoes.has(posicao)) {
       return "Há uma aula em uma turma ou posição inexistente.";
     }
 
-    const referencia = encontrarVinculo(turma, atribuicao);
+    const op = encontrarVinculo(turma, atribuicao);
 
-    if (!referencia) {
+    if (!op) {
       return `Vínculo inválido na turma ${turma.nome}.`;
     }
 
-    const { professor, vinculo } = referencia;
     const [dia] = posicao.split(":");
 
-    if ((professor.indisponibilidades || [])
-        .includes(posicao)) {
-      return `${professor.nome} está indisponível em ${posicao}.`;
-    }
+    for (const { professor, vinculo } of op.professores) {
+      if ((professor.indisponibilidades || [])
+          .includes(posicao)) {
+        return `${professor.nome} está indisponível em ${posicao}.`;
+      }
 
-    const ocupacao = `${professor.id}|${posicao}`;
+      const ocupacao = `${professor.id}|${posicao}`;
 
-    if (ocupacoes.has(ocupacao)) {
-      return `${professor.nome} foi colocado em duas turmas ` +
-        `no mesmo horário.`;
-    }
+      if (ocupacoes.has(ocupacao)) {
+        return `${professor.nome} foi colocado em duas turmas ` +
+          `no mesmo horário.`;
+      }
 
-    ocupacoes.set(ocupacao, true);
+      ocupacoes.add(ocupacao);
 
-    const chaveVinculo =
-      `${professor.id}|${nomeNormalizado(turma.nome)}|` +
-      nomeNormalizado(vinculo.disciplina);
+      const chaveVinculo =
+        `${professor.id}|${nomeNormalizado(turma.nome)}|` +
+        nomeNormalizado(vinculo.disciplina);
 
-    const totalAtual = (totais.get(chaveVinculo) || 0) + 1;
-    totais.set(chaveVinculo, totalAtual);
+      const totalAtual =
+        (totais.get(chaveVinculo) || 0) + 1;
 
-    if (totalAtual > Number(vinculo.aulas)) {
-      return `${professor.nome} ultrapassou as aulas semanais ` +
-        `de ${vinculo.disciplina} na turma ${turma.nome}.`;
-    }
+      totais.set(chaveVinculo, totalAtual);
 
-    const chaveDia = `${professor.id}|${dia}`;
-    const totalDia = (diarios.get(chaveDia) || 0) + 1;
-    diarios.set(chaveDia, totalDia);
+      if (totalAtual > Number(vinculo.aulas)) {
+        return `${professor.nome} ultrapassou as aulas semanais ` +
+          `de ${vinculo.disciplina} na turma ${turma.nome}.`;
+      }
 
-    if (totalDia > Number(professor.maxDia)) {
-      return `${professor.nome} ultrapassou o limite ` +
-        `de aulas diárias.`;
-    }
+      const chaveDia = `${professor.id}|${dia}`;
+      const totalDia = (diarios.get(chaveDia) || 0) + 1;
+      diarios.set(chaveDia, totalDia);
 
-    const chaveVDia = `${chaveVinculo}|${dia}`;
-    const totalVDia = (diariosVinculo.get(chaveVDia) || 0) + 1;
-    diariosVinculo.set(chaveVDia, totalVDia);
+      if (totalDia > Number(professor.maxDia)) {
+        return `${professor.nome} ultrapassou o limite de aulas diárias.`;
+      }
 
-    if (totalVDia > Number(vinculo.maxDia)) {
-      return `${professor.nome} ultrapassou o máximo diário ` +
-        `de ${vinculo.disciplina} na turma ${turma.nome}.`;
+      const chaveVDia = `${chaveVinculo}|${dia}`;
+      const totalVDia =
+        (diariosVinculo.get(chaveVDia) || 0) + 1;
+
+      diariosVinculo.set(chaveVDia, totalVDia);
+
+      if (totalVDia > Number(vinculo.maxDia)) {
+        return `${professor.nome} ultrapassou o máximo diário de ` +
+          `${vinculo.disciplina} na turma ${turma.nome}.`;
+      }
     }
   }
 
   if (verificarCompletude) {
+    if (!turmas.length) {
+      return "Cadastre pelo menos uma turma.";
+    }
+
     for (const turma of turmas) {
-      const total = posicoesGrade().filter(pos =>
+      const total = posicoes.filter(pos =>
         !!dados[chaveCelula(turma.id, pos)]
       ).length;
 
@@ -258,41 +355,18 @@ function validarGrade(dados, verificarCompletude = false) {
 
       const distribuicao = obterDistribuicaoTurma(turma.nome);
 
-      if (distribuicao.reduce((s, v) => s + v.aulas, 0) !== 30) {
+      if (
+        distribuicao.reduce(
+          (s, v) => s + Number(v.aulas), 0
+        ) !== 30
+      ) {
         return `A carga cadastrada de ${turma.nome} não é 30.`;
       }
-
-      for (const v of distribuicao) {
-        const chaveV =
-          `${v.professorId}|${nomeNormalizado(turma.nome)}|` +
-          nomeNormalizado(v.disciplina);
-
-        if ((totais.get(chaveV) || 0) !== Number(v.aulas)) {
-          return `A distribuição de ${v.disciplina} em ` +
-            `${turma.nome} não está completa.`;
-        }
-      }
     }
-  }
 
-  // Uma turma vazia também precisa ser reconhecida como
-  // uma grade ainda não concluída.
-  if (verificarCompletude && turmas.length === 0) {
-    return "Cadastre pelo menos uma turma.";
-  }
-
-  // VALIDAÇÃO DAS AULAS GEMINADAS NA GRADE COMPLETA
-
-  if (verificarCompletude) {
+    // Confere cada participante da aula compartilhada.
     for (const professor of professores) {
-      for (const vinculo of professor.vinculos) {
-        if (vinculo.geminadas !== "obrigatoria") {
-          continue;
-        }
-
-        const exigidos = Number(vinculo.paresGeminados || 0);
-        if (exigidos === 0) continue;
-
+      for (const vinculo of professor.vinculos || []) {
         const turma = turmas.find(t =>
           nomeNormalizado(t.nome) ===
           nomeNormalizado(vinculo.turma)
@@ -302,11 +376,33 @@ function validarGrade(dados, verificarCompletude = false) {
           return `Turma não encontrada: ${vinculo.turma}.`;
         }
 
+        const chaveV =
+          `${professor.id}|${nomeNormalizado(turma.nome)}|` +
+          nomeNormalizado(vinculo.disciplina);
+
+        if (
+          (totais.get(chaveV) || 0) !==
+          Number(vinculo.aulas)
+        ) {
+          return `A distribuição de ${vinculo.disciplina} em ` +
+            `${turma.nome} não está completa para ${professor.nome}.`;
+        }
+
+        if (vinculo.geminadas !== "obrigatoria") {
+          continue;
+        }
+
+        const exigidos = Number(
+          vinculo.paresGeminados || 0
+        );
+
+        if (!exigidos) continue;
+
         let paresEncontrados = 0;
 
         for (const dia of DIAS_GRADE) {
           for (const periodo of ["regular", "contraturno"]) {
-            const slots = posicoesGrade().filter(pos =>
+            const slots = posicoes.filter(pos =>
               pos.startsWith(`${dia.id}:${periodo}:`)
             );
 
@@ -318,19 +414,27 @@ function validarGrade(dados, verificarCompletude = false) {
               ];
 
               const corresponde = atribuicao &&
-                atribuicao.professorId === professor.id &&
+                (
+                  Array.isArray(atribuicao.professoresIds)
+                    ? atribuicao.professoresIds.includes(professor.id)
+                    : atribuicao.professorId === professor.id
+                ) &&
                 nomeNormalizado(atribuicao.disciplina) ===
-                nomeNormalizado(vinculo.disciplina);
+                  nomeNormalizado(vinculo.disciplina);
 
               if (corresponde) {
                 consecutivas++;
               } else {
-                paresEncontrados += Math.floor(consecutivas / 2);
+                paresEncontrados += Math.floor(
+                  consecutivas / 2
+                );
                 consecutivas = 0;
               }
             }
 
-            paresEncontrados += Math.floor(consecutivas / 2);
+            paresEncontrados += Math.floor(
+              consecutivas / 2
+            );
           }
         }
 
@@ -349,7 +453,11 @@ function validarGrade(dados, verificarCompletude = false) {
 function elementoGrade(tag, texto, classe = "") {
   const elemento = document.createElement(tag);
   elemento.textContent = texto;
-  if (classe) elemento.className = classe;
+
+  if (classe) {
+    elemento.className = classe;
+  }
+
   return elemento;
 }
 
@@ -358,7 +466,6 @@ function mensagemGrade(texto, erro = false) {
   elemento.textContent = texto;
   elemento.className = erro ? "erro" : "sucesso";
 }
-
 
 function aplicarAlteracao(novaGrade) {
   if (gradeDesatualizada()) {
@@ -376,8 +483,7 @@ function aplicarAlteracao(novaGrade) {
     return false;
   }
 
-  // Uma grade completa deve continuar completa
-  // após qualquer alteração manual.
+  // Uma grade completa deve continuar completa.
   if (!validarGrade(grade, true)) {
     const erroCompleto = validarGrade(novaGrade, true);
 
@@ -405,10 +511,10 @@ function aplicarAlteracao(novaGrade) {
   }
 }
 
-
 function editarAula(chave) {
   const { turmaId } = dadosCelula(chave);
   const turma = turmas.find(t => t.id === turmaId);
+
   if (!turma) return;
 
   const opcoes = opcoesTurma(turma);
@@ -420,11 +526,17 @@ function editarAula(chave) {
   editor.className = "editor-horario";
 
   const grupo = document.createElement("div");
+
   const label = elementoGrade(
-    "label", `Selecionar aula — ${turma.nome}`
+    "label",
+    `Selecionar aula — ${turma.nome}`
   );
+
   const select = document.createElement("select");
-  select.setAttribute("aria-label", "Disciplina e professor");
+  select.setAttribute(
+    "aria-label",
+    "Disciplina e professor"
+  );
 
   const opcaoVazia = document.createElement("option");
   opcaoVazia.value = "";
@@ -440,15 +552,29 @@ function editarAula(chave) {
   });
 
   const atual = grade[chave];
+
   const indiceAtual = opcoes.findIndex(op =>
     atual &&
-    op.professorId === atual.professorId &&
+    op.professoresIds.length ===
+      (
+        Array.isArray(atual.professoresIds)
+          ? atual.professoresIds.length
+          : 1
+      ) &&
+    op.professoresIds.every(id =>
+      (
+        Array.isArray(atual.professoresIds)
+          ? atual.professoresIds
+          : [atual.professorId]
+      ).includes(id)
+    ) &&
     nomeNormalizado(op.disciplina) ===
       nomeNormalizado(atual.disciplina)
   );
 
-  select.value = indiceAtual >= 0 ?
-    String(indiceAtual) : "";
+  select.value = indiceAtual >= 0
+    ? String(indiceAtual)
+    : "";
 
   grupo.append(label, select);
 
@@ -463,9 +589,12 @@ function editarAula(chave) {
       delete nova[chave];
     } else {
       const op = opcoes[Number(select.value)];
+
       nova[chave] = {
         professorId: op.professorId,
-        disciplina: op.disciplina
+        professoresIds: [...op.professoresIds],
+        disciplina: op.disciplina,
+        grupoCompartilhado: op.grupoCompartilhado
       };
     }
 
@@ -474,21 +603,34 @@ function editarAula(chave) {
     }
   });
 
-  const cancelar = elementoGrade("button", "Cancelar");
+  const cancelar = elementoGrade(
+    "button",
+    "Cancelar"
+  );
+
   cancelar.className = "btn-secundario";
   cancelar.type = "button";
-  cancelar.addEventListener("click", () => editor.remove());
+
+  cancelar.addEventListener(
+    "click",
+    () => editor.remove()
+  );
 
   editor.append(grupo, salvar, cancelar);
 
   gh("grade-escolar").before(editor);
-  editor.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  editor.scrollIntoView({
+    behavior: "smooth",
+    block: "nearest"
+  });
 }
 
 function selecionarCelula(chave, elemento) {
   if (!selecaoGrade) {
     selecaoGrade = chave;
     elemento.classList.add("selecionada");
+
     mensagemGrade(
       "Clique em outra célula para trocar as posições. " +
       "Clique novamente nesta célula para editar."
@@ -498,8 +640,12 @@ function selecionarCelula(chave, elemento) {
 
   if (selecaoGrade === chave) {
     selecaoGrade = null;
+
     document.querySelectorAll(".celula-aula")
-      .forEach(c => c.classList.remove("selecionada"));
+      .forEach(c =>
+        c.classList.remove("selecionada")
+      );
+
     editarAula(chave);
     return;
   }
@@ -550,6 +696,7 @@ function criarTabelaHorario(turma, periodo, quantidade) {
 
   for (let aula = 1; aula <= quantidade; aula++) {
     const tr = document.createElement("tr");
+
     tr.appendChild(
       elementoGrade("th", `${aula}ª aula`)
     );
@@ -558,7 +705,8 @@ function criarTabelaHorario(turma, periodo, quantidade) {
       const td = document.createElement("td");
 
       const posicao = `${dia.id}:${periodo}:${aula}`;
-      const existe = periodo === "regular" ||
+      const existe =
+        periodo === "regular" ||
         dia.id === config.contraturno;
 
       if (!existe) {
@@ -568,18 +716,25 @@ function criarTabelaHorario(turma, periodo, quantidade) {
         const chave = chaveCelula(turma.id, posicao);
         const atribuicao = grade[chave];
 
-        td.className = atribuicao ?
-          "celula-aula preenchida" :
-          "celula-aula vazia";
+        td.className = atribuicao
+          ? "celula-aula preenchida"
+          : "celula-aula vazia";
 
         if (atribuicao) {
-          const referencia = encontrarVinculo(turma, atribuicao);
+          const referencia = encontrarVinculo(
+            turma,
+            atribuicao
+          );
 
           if (referencia) {
             td.append(
-              elementoGrade("strong", atribuicao.disciplina),
               elementoGrade(
-                "small", referencia.professor.nome
+                "strong",
+                atribuicao.disciplina
+              ),
+              elementoGrade(
+                "small",
+                referencia.professor
               )
             );
           } else {
@@ -592,6 +747,7 @@ function criarTabelaHorario(turma, periodo, quantidade) {
 
         td.tabIndex = 0;
         td.setAttribute("role", "button");
+
         td.setAttribute(
           "aria-label",
           `${turma.nome}, ${dia.nome}, ` +
@@ -603,7 +759,10 @@ function criarTabelaHorario(turma, periodo, quantidade) {
         });
 
         td.addEventListener("keydown", evento => {
-          if (evento.key === "Enter" || evento.key === " ") {
+          if (
+            evento.key === "Enter" ||
+            evento.key === " "
+          ) {
             evento.preventDefault();
             selecionarCelula(chave, td);
           }
@@ -628,11 +787,11 @@ function criarTabelaHorario(turma, periodo, quantidade) {
 function renderizarGrade() {
   const container = gh("grade-escolar");
   const resumo = gh("resumo-grade");
+
   container.replaceChildren();
   resumo.replaceChildren();
 
   const posicoes = posicoesGrade();
-
   let totalPreenchido = 0;
 
   turmas.forEach(turma => {
@@ -643,12 +802,18 @@ function renderizarGrade() {
     const bloco = document.createElement("article");
     bloco.className = "bloco-horario";
 
-    bloco.appendChild(elementoGrade("h3", turma.nome));
+    bloco.appendChild(
+      elementoGrade("h3", turma.nome)
+    );
 
     const config = configGrade();
 
     bloco.appendChild(
-      criarTabelaHorario(turma, "regular", config.aulas)
+      criarTabelaHorario(
+        turma,
+        "regular",
+        config.aulas
+      )
     );
 
     if (config.aulas === 5) {
@@ -665,7 +830,11 @@ function renderizarGrade() {
       );
 
       bloco.appendChild(
-        criarTabelaHorario(turma, "contraturno", 5)
+        criarTabelaHorario(
+          turma,
+          "contraturno",
+          5
+        )
       );
     }
 
@@ -679,10 +848,12 @@ function renderizarGrade() {
 
   div.append(
     elementoGrade(
-      "span", `${turmas.length} turma(s)`
+      "span",
+      `${turmas.length} turma(s)`
     ),
     elementoGrade(
-      "span", `${totalPreenchido}/${totalNecessario} aulas`
+      "span",
+      `${totalPreenchido}/${totalNecessario} aulas`
     ),
     elementoGrade(
       "span",
@@ -702,7 +873,6 @@ function renderizarGrade() {
     );
   }
 
-
   const erro = validarGrade(grade);
 
   if (gradeDesatualizada()) {
@@ -711,29 +881,29 @@ function renderizarGrade() {
       "Gere novamente sem preservar as aulas.",
       true
     );
-
   } else if (erro) {
     mensagemGrade(
       `Atenção: existem dados inválidos. ${erro}`,
       true
     );
-
   } else if (turmas.length) {
-    const erroFinal = validarGrade(grade, true);
+    const erroFinal = validarGrade(
+      grade,
+      true
+    );
 
     mensagemGrade(
-      erroFinal || "Todas as 30 aulas estão distribuídas!",
+      erroFinal ||
+        "Todas as 30 aulas estão distribuídas!",
       !!erroFinal
     );
   }
 }
 
-
 gh("atualizar-grade").addEventListener("click", () => {
   selecaoGrade = null;
   renderizarGrade();
 });
-
 
 gh("imprimir-grade").addEventListener("click", () => {
   if (gradeDesatualizada()) {
@@ -757,13 +927,13 @@ gh("imprimir-grade").addEventListener("click", () => {
   window.print();
 });
 
-
-
 gh("limpar-grade").addEventListener("click", () => {
   if (!confirm(
     "Remover todas as aulas posicionadas? " +
     "Os cadastros serão mantidos."
-  )) return;
+  )) {
+    return;
+  }
 
   try {
     salvarGrade({});
@@ -778,6 +948,5 @@ gh("limpar-grade").addEventListener("click", () => {
     );
   }
 });
-
 
 renderizarGrade();
