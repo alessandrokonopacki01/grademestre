@@ -5,6 +5,10 @@ let turmas = carregarTurmas();
 
 const elTurma = id => document.getElementById(id);
 
+// ==========================================
+// ARMAZENAMENTO
+// ==========================================
+
 function carregarTurmas() {
   try {
     const dados = JSON.parse(
@@ -18,7 +22,10 @@ function carregarTurmas() {
 }
 
 function salvarTurmas() {
-  localStorage.setItem(CHAVE_TURMAS, JSON.stringify(turmas));
+  localStorage.setItem(
+    CHAVE_TURMAS,
+    JSON.stringify(turmas)
+  );
 
   if (typeof avisarGradeDesatualizada === "function") {
     avisarGradeDesatualizada();
@@ -34,7 +41,6 @@ function normalizarNome(nome) {
 
 function elementoTurma(tag, texto, classe = "") {
   const elemento = document.createElement(tag);
-
   elemento.textContent = texto;
 
   if (classe) {
@@ -45,14 +51,10 @@ function elementoTurma(tag, texto, classe = "") {
 }
 
 // ==========================================
-// CONFIGURAÇÃO INDIVIDUAL DAS TURMAS
+// MODELO ESCOLAR
 // ==========================================
 
-function cargaSemanalTurma(turma) {
-  return Number(turma?.aulasSemanais) === 25 ? 25 : 30;
-}
-
-function contraturnoTurma(turma) {
+function configuracaoEscolarTurmas() {
   let config = {};
 
   try {
@@ -61,9 +63,76 @@ function contraturnoTurma(turma) {
     ) || {};
   } catch {}
 
+  return {
+    modelo: String(config.modelo || "6"),
+    contraturno: config.contraturno || "segunda"
+  };
+}
+
+function aulasRegularesPorDia() {
+  return configuracaoEscolarTurmas().modelo === "5"
+    ? 5
+    : 6;
+}
+
+function modelosPermitidosTurma() {
+  if (aulasRegularesPorDia() === 6) {
+    return [30];
+  }
+
+  return [25, 30];
+}
+
+// Carga efetiva da turma.
+//
+// Escola com 6 aulas/dia:
+// todas as turmas têm 30 aulas.
+//
+// Escola com 5 aulas/dia:
+// cada turma pode ter 25 ou 30 aulas.
+
+function cargaSemanalTurma(turma) {
+  if (aulasRegularesPorDia() === 6) {
+    return 30;
+  }
+
+  return Number(turma?.aulasSemanais) === 25
+    ? 25
+    : 30;
+}
+
+// Contraturno só existe quando a escola tem
+// 5 aulas por dia e a turma possui 30 aulas.
+
+function turmaTemContraturno(turma) {
+  return (
+    aulasRegularesPorDia() === 5 &&
+    cargaSemanalTurma(turma) === 30
+  );
+}
+
+function contraturnoTurma(turma) {
+  if (!turmaTemContraturno(turma)) {
+    return null;
+  }
+
+  const config = configuracaoEscolarTurmas();
+
   return turma?.diaContraturno ||
     config.contraturno ||
     "segunda";
+}
+
+function nomeDiaTurma(dia) {
+  const nomes = {
+    segunda: "Segunda-feira",
+    terca: "Terça-feira",
+    quarta: "Quarta-feira",
+    quinta: "Quinta-feira",
+    sexta: "Sexta-feira"
+  };
+
+  return nomes[dia] || dia;
 }
 
 // ==========================================
@@ -73,6 +142,7 @@ function contraturnoTurma(turma) {
 function obterDistribuicaoTurma(nomeTurma) {
   const resultado = [];
   const grupos = new Map();
+
   const chaveTurma = normalizarNome(nomeTurma);
 
   professores.forEach(professor => {
@@ -83,9 +153,9 @@ function obterDistribuicaoTurma(nomeTurma) {
         return;
       }
 
-      const codigo = String(
+      const codigo = normalizarNome(
         vinculo.grupoCompartilhado || ""
-      ).trim().toLocaleLowerCase("pt-BR");
+      );
 
       const item = {
         professorId: professor.id,
@@ -96,12 +166,16 @@ function obterDistribuicaoTurma(nomeTurma) {
         grupoCompartilhado: codigo
       };
 
+      // Aula individual.
       if (!codigo) {
         resultado.push(item);
         return;
       }
 
+      // Aula compartilhada:
+      // conta somente uma vez para a turma.
       const chaveGrupo = `${chaveTurma}|${codigo}`;
+
       const existente = grupos.get(chaveGrupo);
 
       if (!existente) {
@@ -125,11 +199,13 @@ function obterDistribuicaoTurma(nomeTurma) {
 }
 
 // ==========================================
-// CÁLCULO DA CARGA HORÁRIA
+// CÁLCULO DE CARGA HORÁRIA
 // ==========================================
 
 function calcularSituacaoTurma(turma) {
-  const distribuicao = obterDistribuicaoTurma(turma.nome);
+  const distribuicao = obterDistribuicaoTurma(
+    turma.nome
+  );
 
   const total = distribuicao.reduce(
     (soma, item) => soma + item.aulas,
@@ -187,7 +263,8 @@ function renderizarResumoTurmas() {
     )
   );
 
-  elTurma("total-turmas").textContent = turmas.length;
+  elTurma("total-turmas").textContent =
+    turmas.length;
 }
 
 // ==========================================
@@ -244,7 +321,7 @@ function criarTabelaDistribuicao(distribuicao) {
 }
 
 // ==========================================
-// RENDERIZAR TURMAS
+// RENDERIZAR CADASTRO DAS TURMAS
 // ==========================================
 
 function renderizarTurmas() {
@@ -261,6 +338,7 @@ function renderizarTurmas() {
         "estado-vazio"
       )
     );
+
     return;
   }
 
@@ -312,14 +390,19 @@ function renderizarTurmas() {
     if (situacao.completa) {
       textoSituacao =
         `Carga horária completa: ${situacao.meta} aulas`;
+
       classeSituacao = "completa";
+
     } else if (situacao.excedentes > 0) {
       textoSituacao =
         `Excesso de ${situacao.excedentes} aula(s)`;
+
       classeSituacao = "excedida";
+
     } else {
       textoSituacao =
         `Faltam ${situacao.faltantes} aula(s)`;
+
       classeSituacao = "incompleta";
     }
 
@@ -331,9 +414,24 @@ function renderizarTurmas() {
       )
     );
 
-    const descricao = cargaSemanalTurma(turma) === 25
-      ? "Somente turno regular"
-      : `Contraturno: ${contraturnoTurma(turma)}`;
+    // Exibição do modelo individual da turma.
+    let descricao;
+
+    if (aulasRegularesPorDia() === 6) {
+      descricao =
+        "6 aulas por dia • 30 semanais • Sem contraturno";
+
+    } else if (turmaTemContraturno(turma)) {
+      descricao =
+        "5 aulas por dia • 30 semanais • " +
+        `Contraturno: ${nomeDiaTurma(
+          contraturnoTurma(turma)
+        )}`;
+
+    } else {
+      descricao =
+        "5 aulas por dia • 25 semanais • Sem contraturno";
+    }
 
     card.appendChild(
       elementoTurma("p", descricao)
@@ -345,6 +443,7 @@ function renderizarTurmas() {
           situacao.distribuicao
         )
       );
+
     } else {
       card.appendChild(
         elementoTurma(
@@ -375,13 +474,14 @@ function renderizarTurmas() {
     });
 
     acoes.append(editar, excluir);
+
     card.appendChild(acoes);
     lista.appendChild(card);
   });
 }
 
 // ==========================================
-// CRIAR OS NOVOS CAMPOS DO FORMULÁRIO
+// CAMPOS DINÂMICOS DO FORMULÁRIO
 // ==========================================
 
 function prepararCamposTurma() {
@@ -401,16 +501,6 @@ function prepararCamposTurma() {
   const campoCarga = document.createElement("select");
   campoCarga.id = "turma-aulas-semanais";
 
-  [
-    ["25", "25 aulas — somente manhã"],
-    ["30", "30 aulas — manhã e contraturno"]
-  ].forEach(([valor, texto]) => {
-    const opcao = document.createElement("option");
-    opcao.value = valor;
-    opcao.textContent = texto;
-    campoCarga.appendChild(opcao);
-  });
-
   const blocoDia = document.createElement("div");
   blocoDia.id = "bloco-dia-contraturno";
 
@@ -422,11 +512,11 @@ function prepararCamposTurma() {
   campoDia.id = "turma-dia-contraturno";
 
   [
-    ["segunda", "Segunda"],
-    ["terca", "Terça"],
-    ["quarta", "Quarta"],
-    ["quinta", "Quinta"],
-    ["sexta", "Sexta"]
+    ["segunda", "Segunda-feira"],
+    ["terca", "Terça-feira"],
+    ["quarta", "Quarta-feira"],
+    ["quinta", "Quinta-feira"],
+    ["sexta", "Sexta-feira"]
   ].forEach(([valor, texto]) => {
     const opcao = document.createElement("option");
     opcao.value = valor;
@@ -435,17 +525,76 @@ function prepararCamposTurma() {
   });
 
   blocoDia.append(rotuloDia, campoDia);
-  bloco.append(rotuloCarga, campoCarga, blocoDia);
 
-  referencia.insertAdjacentElement("afterend", bloco);
+  bloco.append(
+    rotuloCarga,
+    campoCarga,
+    blocoDia
+  );
+
+  referencia.insertAdjacentElement(
+    "afterend",
+    bloco
+  );
 
   campoCarga.addEventListener("change", () => {
-    blocoDia.hidden = campoCarga.value !== "30";
+    atualizarCamposModeloTurma();
   });
 }
 
 // ==========================================
-// ABRIR E FECHAR EDITOR
+// ATUALIZAR OPÇÕES SEGUNDO A ESCOLA
+// ==========================================
+
+function atualizarCamposModeloTurma() {
+  const campoCarga = elTurma("turma-aulas-semanais");
+  const blocoDia = elTurma("bloco-dia-contraturno");
+
+  if (!campoCarga || !blocoDia) {
+    return;
+  }
+
+  const modelo = aulasRegularesPorDia();
+  const valorAnterior = Number(campoCarga.value);
+
+  campoCarga.replaceChildren();
+
+  if (modelo === 6) {
+    const opcao = document.createElement("option");
+    opcao.value = "30";
+    opcao.textContent =
+      "30 aulas — 6 por dia, sem contraturno";
+
+    campoCarga.appendChild(opcao);
+    campoCarga.value = "30";
+
+    campoCarga.disabled = true;
+    blocoDia.hidden = true;
+
+  } else {
+    campoCarga.disabled = false;
+
+    [
+      ["25", "25 aulas — somente manhã"],
+      ["30", "30 aulas — manhã e contraturno"]
+    ].forEach(([valor, texto]) => {
+      const opcao = document.createElement("option");
+      opcao.value = valor;
+      opcao.textContent = texto;
+      campoCarga.appendChild(opcao);
+    });
+
+    campoCarga.value =
+      modelosPermitidosTurma().includes(valorAnterior)
+        ? String(valorAnterior)
+        : "30";
+
+    blocoDia.hidden = campoCarga.value !== "30";
+  }
+}
+
+// ==========================================
+// ABRIR EDITOR DA TURMA
 // ==========================================
 
 function abrirEditorTurma(turma = null) {
@@ -454,22 +603,29 @@ function abrirEditorTurma(turma = null) {
   elTurma("editor-turma").hidden = false;
   elTurma("form-turma").reset();
 
-  elTurma("turma-id").value = turma?.id || "";
-  elTurma("turma-nome").value = turma?.nome || "";
+  elTurma("turma-id").value =
+    turma?.id || "";
 
+  elTurma("turma-nome").value =
+    turma?.nome || "";
+
+  // Primeiro configura as opções disponíveis
+  // de acordo com o modelo da escola.
+  atualizarCamposModeloTurma();
+
+  // Depois escolhe a carga da turma.
   elTurma("turma-aulas-semanais").value =
     String(cargaSemanalTurma(turma));
 
   elTurma("turma-dia-contraturno").value =
-    contraturnoTurma(turma);
+    turmaTemContraturno(turma)
+      ? contraturnoTurma(turma)
+      : configuracaoEscolarTurmas().contraturno;
 
-  elTurma("turma-aulas-semanais").dispatchEvent(
-    new Event("change")
-  );
+  atualizarCamposModeloTurma();
 
-  elTurma("titulo-editor-turma").textContent = turma
-    ? "Editar turma"
-    : "Cadastrar turma";
+  elTurma("titulo-editor-turma").textContent =
+    turma ? "Editar turma" : "Cadastrar turma";
 
   elTurma("editor-turma").scrollIntoView({
     behavior: "smooth",
@@ -482,15 +638,19 @@ function fecharEditorTurma() {
 }
 
 // ==========================================
-// EXCLUIR TURMA
+// EXCLUSÃO DE TURMAS
 // ==========================================
 
 function excluirTurma(id) {
   const turma = turmas.find(item => item.id === id);
 
-  if (!turma) return;
+  if (!turma) {
+    return;
+  }
 
-  const vinculos = obterDistribuicaoTurma(turma.nome);
+  const vinculos = obterDistribuicaoTurma(
+    turma.nome
+  );
 
   if (vinculos.length) {
     alert(
@@ -511,6 +671,7 @@ function excluirTurma(id) {
     salvarTurmas();
     fecharEditorTurma();
     renderizarTurmas();
+
   } catch (erro) {
     alert("Erro ao excluir a turma.");
     console.error(erro);
@@ -518,12 +679,13 @@ function excluirTurma(id) {
 }
 
 // ==========================================
-// BOTÕES DO CADASTRO
+// BOTÕES
 // ==========================================
 
-elTurma("nova-turma").addEventListener("click", () => {
-  abrirEditorTurma();
-});
+elTurma("nova-turma").addEventListener(
+  "click",
+  () => abrirEditorTurma()
+);
 
 elTurma("cancelar-turma").addEventListener(
   "click",
@@ -531,7 +693,7 @@ elTurma("cancelar-turma").addEventListener(
 );
 
 // ==========================================
-// SALVAR CADASTRO DA TURMA
+// SALVAR TURMA
 // ==========================================
 
 elTurma("form-turma").addEventListener(
@@ -560,45 +722,64 @@ elTurma("form-turma").addEventListener(
       return;
     }
 
-    const aulasSemanais = Number(
-      elTurma("turma-aulas-semanais").value
-    );
+    const modelo = aulasRegularesPorDia();
 
-    const diaContraturno =
-      elTurma("turma-dia-contraturno").value;
-
-    if (![25, 30].includes(aulasSemanais)) {
-      alert("Escolha uma carga semanal válida.");
-      return;
-    }
+    const aulasSemanais = modelo === 6
+      ? 30
+      : Number(
+          elTurma("turma-aulas-semanais").value
+        );
 
     if (
-      aulasSemanais === 30 &&
-      ![
-        "segunda",
-        "terca",
-        "quarta",
-        "quinta",
-        "sexta"
-      ].includes(diaContraturno)
+      !modelosPermitidosTurma().includes(
+        aulasSemanais
+      )
     ) {
-      alert("Selecione um dia válido para o contraturno.");
+      alert(
+        "A carga semanal selecionada é incompatível " +
+        "com o modelo desta escola."
+      );
       return;
     }
 
-    const turmaAnterior = turmas.find(t => t.id === id);
+    const diaInformado =
+      elTurma("turma-dia-contraturno").value;
 
-    // Copia os professores para não alterar o
-    // cadastro original antes de salvar.
+    const precisaContraturno =
+      modelo === 5 && aulasSemanais === 30;
 
-    const professoresAtualizados = professores.map(p => ({
-      ...p,
-      vinculos: (p.vinculos || []).map(v => ({
-        ...v
-      }))
-    }));
+    const diasValidos = [
+      "segunda",
+      "terca",
+      "quarta",
+      "quinta",
+      "sexta"
+    ];
 
-    // Se a turma for renomeada, atualiza os vínculos.
+    if (
+      precisaContraturno &&
+      !diasValidos.includes(diaInformado)
+    ) {
+      alert(
+        "Selecione um dia válido para o contraturno."
+      );
+      return;
+    }
+
+    const turmaAnterior = turmas.find(
+      t => t.id === id
+    );
+
+    // Copia os cadastros antes de alterar.
+    const professoresAtualizados =
+      professores.map(p => ({
+        ...p,
+        vinculos: (p.vinculos || []).map(v => ({
+          ...v
+        }))
+      }));
+
+    // Atualizar vínculos ao renomear a turma.
     if (
       turmaAnterior &&
       normalizarNome(turmaAnterior.nome) !==
@@ -615,7 +796,7 @@ elTurma("form-turma").addEventListener(
       if (vinculosNoDestino) {
         alert(
           "Já existem vínculos de professores " +
-          "com o novo nome. Escolha outro nome."
+          "com o novo nome. Escolha outro."
         );
         return;
       }
@@ -632,11 +813,14 @@ elTurma("form-turma").addEventListener(
       });
     }
 
+    // Guarda explicitamente a organização
+    // escolar escolhida.
     const configuracaoTurma = {
       nome,
       aulasSemanais,
-      diaContraturno:
-        aulasSemanais === 30 ? diaContraturno : null
+      diaContraturno: precisaContraturno
+        ? diaInformado
+        : null
     };
 
     const novasTurmas = id
@@ -652,9 +836,6 @@ elTurma("form-turma").addEventListener(
             ...configuracaoTurma
           }
         ];
-
-    // Salva os cadastros com tentativa de
-    // restauração se houver erro.
 
     const backupTurmas =
       localStorage.getItem(CHAVE_TURMAS);
@@ -676,15 +857,16 @@ elTurma("form-turma").addEventListener(
       turmas = novasTurmas;
       professores = professoresAtualizados;
 
+      fecharEditorTurma();
       renderizarProfessores();
       renderizarTurmas();
-      fecharEditorTurma();
 
       if (
         typeof avisarGradeDesatualizada === "function"
       ) {
         avisarGradeDesatualizada();
       }
+
     } catch (erro) {
       try {
         if (backupTurmas === null) {
@@ -704,9 +886,10 @@ elTurma("form-turma").addEventListener(
             backupProfessores
           );
         }
+
       } catch (erroRestauracao) {
         console.error(
-          "Falha ao restaurar os cadastros:",
+          "Falha ao restaurar:",
           erroRestauracao
         );
       }
