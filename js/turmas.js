@@ -18,9 +18,10 @@ function carregarTurmas() {
 
 function salvarTurmas() {
   localStorage.setItem(CHAVE_TURMAS, JSON.stringify(turmas));
-}
-if (typeof avisarGradeDesatualizada === "function") {
-  avisarGradeDesatualizada();
+
+  if (typeof avisarGradeDesatualizada === "function") {
+    avisarGradeDesatualizada();
+  }
 }
 
 function normalizarNome(nome) {
@@ -35,26 +36,58 @@ function elementoTurma(tag, texto, classe = "") {
 }
 
 // Consulta os vínculos já cadastrados pelos professores.
+
 function obterDistribuicaoTurma(nomeTurma) {
   const resultado = [];
-  const chave = normalizarNome(nomeTurma);
+  const grupos = new Map();
+  const chaveTurma = normalizarNome(nomeTurma);
 
   professores.forEach(professor => {
     (professor.vinculos || []).forEach(vinculo => {
-      if (normalizarNome(vinculo.turma) !== chave) return;
+      if (normalizarNome(vinculo.turma) !== chaveTurma) {
+        return;
+      }
 
-      resultado.push({
+      const codigo = String(
+        vinculo.grupoCompartilhado || ""
+      ).trim().toLocaleLowerCase("pt-BR");
+
+      const item = {
         professorId: professor.id,
         professor: professor.nome,
         disciplina: vinculo.disciplina,
         aulas: Number(vinculo.aulas),
-        maxDia: Number(vinculo.maxDia)
-      });
+        maxDia: Number(vinculo.maxDia),
+        grupoCompartilhado: codigo
+      };
+
+      if (!codigo) {
+        resultado.push(item);
+        return;
+      }
+
+      const chaveGrupo = `${chaveTurma}|${codigo}`;
+      const existente = grupos.get(chaveGrupo);
+
+      if (!existente) {
+        item.professoresIds = [professor.id];
+        grupos.set(chaveGrupo, item);
+        resultado.push(item);
+        return;
+      }
+
+      existente.professor += ` + ${professor.nome}`;
+      existente.professoresIds.push(professor.id);
+      existente.maxDia = Math.min(
+        existente.maxDia,
+        item.maxDia
+      );
     });
   });
 
   return resultado;
 }
+
 
 function calcularSituacaoTurma(turma) {
   const distribuicao = obterDistribuicaoTurma(turma.nome);

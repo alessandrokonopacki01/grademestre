@@ -277,8 +277,7 @@ if (
     and professor not in vinculo["professoresIds"]
 ):
     continue
-
-            if dia is not None and slot.split(":")[0] != dia:
+    if dia is not None and slot.split(":")[0] != dia:
                 continue
 
             if posicao is not None and slot != posicao:

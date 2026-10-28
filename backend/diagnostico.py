@@ -38,6 +38,7 @@ def diagnosticar(dados):
         })
 
     cargas_por_turma = defaultdict(int)
+    grupos_contabilizados = set()
 
     for professor in professores:
         nome = professor.get("nome", "Professor sem nome")
@@ -91,7 +92,24 @@ def diagnosticar(dados):
             aulas = int(vinculo.get("aulas", 0))
             max_vinculo = int(vinculo.get("maxDia", 0))
 
-            cargas_por_turma[turma.strip().casefold()] += aulas
+
+            turma_chave = " ".join(
+                turma.strip().casefold().split()
+            )
+
+            grupo = str(
+                vinculo.get("grupoCompartilhado") or ""
+            ).strip().casefold()
+
+            if grupo:
+                chave_grupo = (turma_chave, grupo)
+
+                if chave_grupo not in grupos_contabilizados:
+                    grupos_contabilizados.add(chave_grupo)
+                    cargas_por_turma[turma_chave] += aulas
+            else:
+                cargas_por_turma[turma_chave] += aulas
+
 
             capacidade_vinculo = sum(
                 min(
