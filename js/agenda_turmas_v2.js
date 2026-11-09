@@ -373,15 +373,32 @@
       if (turmas.some(t => !t.agenda)) {
         throw new Error("Configure a agenda V2 de todas as turmas.");
       }
-      const docentes = JSON.parse(localStorage.getItem("grademestre_professores") || "[]");
-      for (const p of docentes) {
-        if ((p.indisponibilidades || []).some(b => typeof b === "string" &&
-            /:(regular|contraturno):/.test(b))) {
-          throw new Error(`Bloqueios antigos de ${p.nome}: adapte os horários dos professores à V2 antes de gerar.`);
-        }
+
+      const docentesOriginais = JSON.parse(
+        localStorage.getItem(
+          "grademestre_professores"
+        ) || "[]"
+      );
+
+      if (!window.GradeMestreBloqueiosV2) {
+        throw new Error(
+          "O módulo de indisponibilidades V2 " +
+          "não foi carregado."
+        );
       }
-      return {schemaVersion: 2, escola: copiar(escola), turmas: copiar(turmas),
-        professores: docentes, fixadas: {}};
+
+      const docentes =
+        window.GradeMestreBloqueiosV2
+          .prepararProfessores(docentesOriginais);
+
+      return {
+        schemaVersion: 2,
+        escola: copiar(escola),
+        turmas: copiar(turmas),
+        professores: docentes,
+        fixadas: {}
+      };
+
     },
     total(turma) { return contar(normalizarAgenda(turma.agenda)); }
   };
