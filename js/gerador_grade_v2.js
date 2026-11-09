@@ -1,11 +1,11 @@
 
 /*
- * GradeMestre V2 — Geração e visualização.
- * Preserva o gerador e a grade da V1.
+ * GradeMestre V2
+ * Geração, visualização e edição manual.
  *
- * Carregar depois de:
- * - agenda_turmas_v2.js
- * - disponibilidade_professores_v2.js
+ * Preserva a grade V1.
+ * Carregar depois dos módulos de turmas
+ * e indisponibilidades V2.
  */
 
 (() => {
@@ -29,15 +29,15 @@
   const $ = id => document.getElementById(id);
 
   const novo = (tag, texto, classe) => {
-    const e = document.createElement(tag);
+    const elemento = document.createElement(tag);
 
     if (texto !== undefined) {
-      e.textContent = texto;
+      elemento.textContent = texto;
     }
 
-    if (classe) e.className = classe;
+    if (classe) elemento.className = classe;
 
-    return e;
+    return elemento;
   };
 
   const ler = (chave, padrao) => {
@@ -53,7 +53,7 @@
       .trim()
       .toLocaleLowerCase("pt-BR");
 
-  const minuto = hora => {
+  function minuto(hora) {
     const [h, m] = String(hora)
       .split(":")
       .map(Number);
@@ -64,13 +64,11 @@
       h < 0 || h > 23 ||
       m < 0 || m > 59
     ) {
-      throw new Error(
-        `Horário inválido: ${hora}`
-      );
+      throw new Error(`Horário inválido: ${hora}`);
     }
 
     return h * 60 + m;
-  };
+  }
 
   // ==========================================
   // CRIAR PAINEL V2
@@ -100,7 +98,6 @@
     <p>
       Gere horários considerando manhã, tarde,
       noite e contraturnos individuais.
-      A grade V1 não será alterada.
     </p>
 
     <div
@@ -153,10 +150,10 @@
   let ocupado = false;
 
   function status(mensagem, erro = false) {
-    const e = $("v2-status-gerador");
+    const elemento = $("v2-status-gerador");
 
-    e.textContent = mensagem;
-    e.style.color = erro
+    elemento.textContent = mensagem;
+    elemento.style.color = erro
       ? "#b91c1c"
       : "#15803d";
   }
@@ -186,8 +183,8 @@
       !escola.horariosConfirmados
     ) {
       throw new Error(
-        "Em Turmas → Calendário V2, confirme " +
-        "e salve os horários reais da escola."
+        "Confirme os horários reais da escola " +
+        "no Calendário V2."
       );
     }
 
@@ -233,7 +230,7 @@
   }
 
   // ==========================================
-  // POSIÇÕES REAIS DAS TURMAS
+  // POSIÇÕES FÍSICAS DA GRADE
   // ==========================================
 
   function posicoesEsperadas(dados) {
@@ -248,7 +245,7 @@
 
       if (!perfil) {
         throw new Error(
-          `Perfil inexistente: ${perfilId}.`
+          `Perfil de horários ausente: ${perfilId}.`
         );
       }
 
@@ -271,7 +268,7 @@
             !Array.isArray(ordens)
           ) {
             throw new Error(
-              `Agenda inválida: ${turma.nome}.`
+              `Agenda inválida em ${turma.nome}, ${dia}.`
             );
           }
 
@@ -285,8 +282,8 @@
               !periodo
             ) {
               throw new Error(
-                `Aula inexistente em ` +
-                `${turma.nome}: ${dia}/${turno}/${ordem}.`
+                `Período inexistente: ` +
+                `${turma.nome}, ${dia}/${turno}/${ordem}.`
               );
             }
 
@@ -298,7 +295,7 @@
 
             if (fim <= inicio) {
               throw new Error(
-                `Horário inválido em ${turma.nome}.`
+                `Horário inválido de ${turma.nome}.`
               );
             }
 
@@ -332,7 +329,7 @@
   }
 
   // ==========================================
-  // AUDITORIA DA RESPOSTA
+  // AUDITORIA DA GRADE
   // ==========================================
 
   function auditarRetorno(grade, dados) {
@@ -352,13 +349,10 @@
     const recebidas =
       Object.keys(grade);
 
-    if (
-      recebidas.length !== esperadas.size
-    ) {
+    if (recebidas.length !== esperadas.size) {
       throw new Error(
-        `O servidor retornou ${recebidas.length} ` +
-        `aulas, mas eram esperadas ` +
-        `${esperadas.size}.`
+        `A grade possui ${recebidas.length} aulas, ` +
+        `mas eram esperadas ${esperadas.size}.`
       );
     }
 
@@ -398,9 +392,12 @@
           ? aula.professoresIds
           : [aula.professorId];
 
-      if (new Set(ids).size !== ids.length) {
+      if (
+        !ids.length ||
+        new Set(ids).size !== ids.length
+      ) {
         throw new Error(
-          `Professor repetido em ${chave}.`
+          `Professores inválidos em ${chave}.`
         );
       }
 
@@ -444,7 +441,7 @@
 
         if (conflito) {
           throw new Error(
-            `Conflito simultâneo detectado para ` +
+            `Conflito simultâneo para ` +
             `${professor.nome} em ${slot.dia}.`
           );
         }
@@ -486,7 +483,8 @@
   // ==========================================
 
   async function enviar(rota, dados) {
-    const controlador = new AbortController();
+    const controlador =
+      new AbortController();
 
     const limite = setTimeout(
       () => controlador.abort(),
@@ -539,17 +537,17 @@
   }
 
   // ==========================================
-  // MOSTRAR DIAGNÓSTICO
+  // DIAGNÓSTICO
   // ==========================================
 
   function mostrarDiagnostico(lista) {
     const area = $("v2-diagnostico");
     area.replaceChildren();
 
-    for (
-      const problema
-      of Array.isArray(lista) ? lista : []
-    ) {
+    const problemas =
+      Array.isArray(lista) ? lista : [];
+
+    for (const problema of problemas) {
       const artigo = novo(
         "article",
         undefined,
@@ -588,7 +586,7 @@
   }
 
   // ==========================================
-  // RENDERIZAR GRADE POR TURNO
+  // RENDERIZAÇÃO DA GRADE V2
   // ==========================================
 
   function renderizar(
@@ -646,7 +644,6 @@
         );
     }
 
-    // Verificar se os cadastros mudaram.
     let aviso = "";
 
     if (comparar) {
@@ -661,10 +658,11 @@
             "Atenção: os cadastros mudaram " +
             "após esta geração. Gere novamente.";
         }
+
       } catch {
         aviso =
           "Atenção: revise os cadastros V2 " +
-          "antes de usar esta grade.";
+          "antes de utilizar esta grade.";
       }
     }
 
@@ -693,7 +691,6 @@
       );
     }
 
-    // Manhã, tarde e noite separadamente.
     for (const turno of TURNOS) {
       const diasComAulas =
         DIAS.filter(dia =>
@@ -726,21 +723,22 @@
       tabela.style.borderCollapse =
         "collapse";
 
-      const thead = novo("thead");
       const cabecalho = novo("tr");
 
-      const colunas = [
-        "Dia",
-        "Horário",
-        ...dados.turmas.map(t => t.nome)
-      ];
-
-      colunas.forEach(nome => {
+      for (
+        const nome
+        of [
+          "Dia",
+          "Horário",
+          ...dados.turmas.map(t => t.nome)
+        ]
+      ) {
         cabecalho.appendChild(
           novo("th", nome)
         );
-      });
+      }
 
+      const thead = novo("thead");
       thead.appendChild(cabecalho);
       tabela.appendChild(thead);
 
@@ -794,6 +792,25 @@
               of dados.turmas
             ) {
               const td = novo("td");
+
+              // Associar posição à célula
+              // para permitir edição manual.
+
+              const posicaoEditavel = [
+                ...esperadas.entries()
+              ].find(
+                ([, slot]) =>
+                  slot.turma.id === turma.id &&
+                  slot.dia === dia &&
+                  slot.turno === turno &&
+                  slot.inicio === linha.inicio &&
+                  slot.fim === linha.fim
+              );
+
+              if (posicaoEditavel) {
+                td.dataset.v2Chave =
+                  posicaoEditavel[0];
+              }
 
               const aula =
                 linha.aulas.get(turma.id);
@@ -855,7 +872,7 @@
   }
 
   // ==========================================
-  // BOTÕES
+  // ESTADO DOS BOTÕES
   // ==========================================
 
   function atualizarBotoes(bloquear) {
@@ -887,18 +904,16 @@
         mostrarDiagnostico([]);
 
         try {
-          const dados =
-            prepararDados();
+          const dados = prepararDados();
 
           status(
             "Validando calendários e cargas..."
           );
 
-          const resultado =
-            await enviar(
-              "/v2/validar",
-              dados
-            );
+          const resultado = await enviar(
+            "/v2/validar",
+            dados
+          );
 
           if (!resultado.valido) {
             throw new Error(
@@ -942,18 +957,16 @@
         mostrarDiagnostico([]);
 
         try {
-          const dados =
-            prepararDados();
+          const dados = prepararDados();
 
           status(
             "Conferindo cargas e agendas..."
           );
 
-          const validacao =
-            await enviar(
-              "/v2/validar",
-              dados
-            );
+          const validacao = await enviar(
+            "/v2/validar",
+            dados
+          );
 
           if (!validacao.valido) {
             throw new Error(
@@ -966,11 +979,10 @@
             `${validacao.totalAulas} aulas...`
           );
 
-          const resultado =
-            await enviar(
-              "/v2/gerar",
-              dados
-            );
+          const resultado = await enviar(
+            "/v2/gerar",
+            dados
+          );
 
           if (!resultado.sucesso) {
             status(
@@ -986,7 +998,6 @@
             return;
           }
 
-          // Nunca salvar sem conferir.
           auditarRetorno(
             resultado.grade,
             dados
@@ -1004,6 +1015,11 @@
             CHAVE,
             JSON.stringify(salvo)
           );
+
+          ultimaGrade = null;
+          botaoDesfazer.disabled = true;
+
+          cancelarSelecao();
 
           renderizar(
             dados,
@@ -1037,7 +1053,7 @@
     );
 
   // ==========================================
-  // IMPRESSÃO V2
+  // IMPRESSÃO
   // ==========================================
 
   $("v2-imprimir-grade")
@@ -1047,9 +1063,7 @@
         const area =
           $("v2-resultado-grade");
 
-        if (
-          !area.querySelector("table")
-        ) {
+        if (!area.querySelector("table")) {
           return;
         }
 
@@ -1058,11 +1072,9 @@
 
         if (!janela) {
           status(
-            "O navegador bloqueou " +
-            "a janela de impressão.",
+            "O navegador bloqueou a janela de impressão.",
             true
           );
-
           return;
         }
 
@@ -1095,6 +1107,704 @@
         janela.print();
       }
     );
+
+  // ==========================================
+  // EDIÇÃO MANUAL V2
+  // ==========================================
+
+  const estiloEdicao = novo("style");
+
+  estiloEdicao.textContent = `
+    #painel-gerador-v2.gm-v2-editando td[data-v2-chave] {
+      cursor: pointer;
+    }
+
+    #painel-gerador-v2.gm-v2-editando
+    td[data-v2-chave]:hover {
+      outline: 2px solid #b99542;
+      outline-offset: -2px;
+    }
+
+    #painel-gerador-v2 td.gm-v2-selecionada {
+      outline: 3px solid #ba8d27 !important;
+      outline-offset: -3px;
+      background: #fff4cb !important;
+    }
+
+    #v2-controles-edicao {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin: 12px 0;
+    }
+  `;
+
+  document.head.appendChild(estiloEdicao);
+
+  const controlesEdicao = novo("div");
+  controlesEdicao.id = "v2-controles-edicao";
+
+  const botaoEditar = novo(
+    "button",
+    "Ativar edição manual",
+    "btn-secundario"
+  );
+
+  botaoEditar.type = "button";
+
+  const botaoCancelar = novo(
+    "button",
+    "Cancelar seleção",
+    "btn-secundario"
+  );
+
+  botaoCancelar.type = "button";
+  botaoCancelar.disabled = true;
+
+  const botaoDesfazer = novo(
+    "button",
+    "Desfazer última troca",
+    "btn-secundario"
+  );
+
+  botaoDesfazer.type = "button";
+  botaoDesfazer.disabled = true;
+
+  const avisoEdicao = novo(
+    "p",
+    "Ative a edição para trocar duas aulas da mesma turma."
+  );
+
+  avisoEdicao.id = "v2-aviso-edicao";
+  avisoEdicao.style.margin =
+    "4px 0 12px";
+
+  controlesEdicao.append(
+    botaoEditar,
+    botaoCancelar,
+    botaoDesfazer
+  );
+
+  painel.insertBefore(
+    controlesEdicao,
+    $("v2-resultado-grade")
+  );
+
+  painel.insertBefore(
+    avisoEdicao,
+    $("v2-resultado-grade")
+  );
+
+  let modoEdicao = false;
+  let primeiraChave = null;
+  let ultimaGrade = null;
+
+  function mensagemEdicao(
+    texto,
+    erro = false
+  ) {
+    avisoEdicao.textContent = texto;
+    avisoEdicao.style.color =
+      erro ? "#b91c1c" : "";
+  }
+
+  function cancelarSelecao() {
+    primeiraChave = null;
+
+    botaoCancelar.disabled = true;
+
+    $("v2-resultado-grade")
+      .querySelectorAll(
+        ".gm-v2-selecionada"
+      )
+      .forEach(
+        td => td.classList.remove(
+          "gm-v2-selecionada"
+        )
+      );
+  }
+
+  // ==========================================
+  // VERIFICAR SE A GRADE ESTÁ ATUALIZADA
+  // ==========================================
+
+  function configuracaoIntacta(dados) {
+    const atual = prepararDados();
+
+    for (
+      const campo
+      of [
+        "escola",
+        "turmas",
+        "professores"
+      ]
+    ) {
+      if (
+        JSON.stringify(atual[campo]) !==
+        JSON.stringify(dados[campo])
+      ) {
+        throw new Error(
+          "Os cadastros ou bloqueios foram alterados. " +
+          "Gere outra grade antes de editar."
+        );
+      }
+    }
+  }
+
+  // ==========================================
+  // CONFERIR BLOQUEIOS DO PROFESSOR
+  // ==========================================
+
+  function professorTemBloqueio(
+    professor,
+    slot,
+    escola
+  ) {
+    for (
+      const bloqueio
+      of professor.indisponibilidades || []
+    ) {
+      let b;
+
+      if (typeof bloqueio === "string") {
+        const partes = bloqueio.split(":");
+
+        let dia;
+        let perfil;
+        let turno;
+        let ordem;
+
+        if (partes.length === 4) {
+          [
+            dia,
+            perfil,
+            turno,
+            ordem
+          ] = partes;
+
+        } else if (
+          partes.length === 3 &&
+          TURNOS.includes(partes[1])
+        ) {
+          [dia, turno, ordem] = partes;
+          perfil = "padrao";
+
+        } else {
+          throw new Error(
+            `Bloqueio antigo de ${professor.nome}: ` +
+            bloqueio
+          );
+        }
+
+        const periodo =
+          escola.perfisHorario?.[perfil]
+            ?.[turno]?.[Number(ordem) - 1];
+
+        if (!periodo) {
+          throw new Error(
+            `Bloqueio sem horário: ${bloqueio}.`
+          );
+        }
+
+        b = {
+          dia,
+          inicio: minuto(periodo.inicio),
+          fim: minuto(periodo.fim)
+        };
+
+      } else if (
+        bloqueio &&
+        typeof bloqueio === "object"
+      ) {
+        b = {
+          dia: bloqueio.dia,
+          inicio: minuto(bloqueio.inicio),
+          fim: minuto(bloqueio.fim)
+        };
+
+      } else {
+        throw new Error(
+          `Bloqueio inválido de ${professor.nome}.`
+        );
+      }
+
+      if (
+        b.dia === slot.dia &&
+        slot.inicio < b.fim &&
+        b.inicio < slot.fim
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // ==========================================
+  // VALIDAÇÃO COMPLETA DA TROCA
+  // ==========================================
+
+  function validarTroca(grade, dados) {
+    // Confere sobreposições e limite global.
+    const slots = auditarRetorno(
+      grade,
+      dados
+    );
+
+    const professores = new Map(
+      dados.professores.map(
+        p => [p.id, p]
+      )
+    );
+
+    const diariasVinculo = new Map();
+    const contagens = new Map();
+
+    for (
+      const [chave, aula]
+      of Object.entries(grade)
+    ) {
+      const slot = slots.get(chave);
+
+      const ids =
+        aula.professoresIds?.length
+          ? aula.professoresIds
+          : [aula.professorId];
+
+      for (const pid of ids) {
+        const professor =
+          professores.get(pid);
+
+        const vinculo =
+          professor.vinculos.find(
+            v =>
+              normal(v.turma) ===
+                normal(slot.turma.nome) &&
+              normal(v.disciplina) ===
+                normal(aula.disciplina) &&
+              normal(v.grupoCompartilhado) ===
+                normal(aula.grupoCompartilhado)
+          );
+
+        if (!vinculo) {
+          throw new Error(
+            `Vínculo não encontrado para ` +
+            `${professor.nome}: ${aula.disciplina}.`
+          );
+        }
+
+        if (
+          professorTemBloqueio(
+            professor,
+            slot,
+            dados.escola
+          )
+        ) {
+          throw new Error(
+            `${professor.nome} está indisponível ` +
+            `em ${slot.dia}, ${slot.turno}, ` +
+            `${slot.ordem}ª aula.`
+          );
+        }
+
+        const chaveDiaria =
+          `${pid}|${slot.turma.id}|` +
+          `${normal(aula.disciplina)}|${slot.dia}`;
+
+        const quantidade =
+          (diariasVinculo.get(chaveDiaria) || 0)
+          + 1;
+
+        diariasVinculo.set(
+          chaveDiaria,
+          quantidade
+        );
+
+        if (
+          quantidade > Number(vinculo.maxDia)
+        ) {
+          throw new Error(
+            `Limite diário da disciplina ` +
+            `${aula.disciplina} excedido para ` +
+            `${professor.nome}.`
+          );
+        }
+
+        const semanal =
+          `${pid}|${slot.turma.id}|` +
+          `${normal(aula.disciplina)}`;
+
+        contagens.set(
+          semanal,
+          (contagens.get(semanal) || 0) + 1
+        );
+      }
+    }
+
+    // Conferir carga semanal e geminadas.
+
+    for (
+      const professor
+      of dados.professores
+    ) {
+      for (
+        const vinculo
+        of professor.vinculos || []
+      ) {
+        const turma = dados.turmas.find(
+          t =>
+            normal(t.nome) ===
+            normal(vinculo.turma)
+        );
+
+        if (!turma) {
+          throw new Error(
+            `Turma de ${professor.nome} não encontrada.`
+          );
+        }
+
+        const semanal =
+          `${professor.id}|${turma.id}|` +
+          `${normal(vinculo.disciplina)}`;
+
+        if (
+          (contagens.get(semanal) || 0) !==
+          Number(vinculo.aulas)
+        ) {
+          throw new Error(
+            `Carga semanal de ${professor.nome} ` +
+            `em ${vinculo.disciplina} foi alterada.`
+          );
+        }
+
+        if (
+          vinculo.geminadas !== "obrigatoria" ||
+          Number(vinculo.paresGeminados) <= 0
+        ) {
+          continue;
+        }
+
+        const grupos = new Map();
+
+        for (
+          const [chave, aula]
+          of Object.entries(grade)
+        ) {
+          const slot = slots.get(chave);
+
+          const ids =
+            aula.professoresIds?.length
+              ? aula.professoresIds
+              : [aula.professorId];
+
+          if (
+            slot.turma.id !== turma.id ||
+            !ids.includes(professor.id) ||
+            normal(aula.disciplina) !==
+              normal(vinculo.disciplina) ||
+            normal(aula.grupoCompartilhado) !==
+              normal(vinculo.grupoCompartilhado)
+          ) {
+            continue;
+          }
+
+          const grupo =
+            `${slot.dia}|${slot.turno}`;
+
+          if (!grupos.has(grupo)) {
+            grupos.set(grupo, []);
+          }
+
+          grupos.get(grupo).push(
+            slot.ordem
+          );
+        }
+
+        let pares = 0;
+
+        for (
+          const ordens
+          of grupos.values()
+        ) {
+          ordens.sort(
+            (a, b) => a - b
+          );
+
+          for (
+            let i = 0;
+            i < ordens.length - 1;
+          ) {
+            if (
+              ordens[i + 1] ===
+              ordens[i] + 1
+            ) {
+              pares++;
+              i += 2;
+            } else {
+              i++;
+            }
+          }
+        }
+
+        if (
+          pares <
+          Number(vinculo.paresGeminados)
+        ) {
+          throw new Error(
+            `A troca desfez as geminadas ` +
+            `obrigatórias de ${professor.nome} ` +
+            `(${vinculo.disciplina}).`
+          );
+        }
+      }
+    }
+  }
+
+  // ==========================================
+  // ATIVAR E DESATIVAR EDIÇÃO
+  // ==========================================
+
+  botaoEditar.addEventListener(
+    "click",
+    () => {
+      modoEdicao = !modoEdicao;
+
+      painel.classList.toggle(
+        "gm-v2-editando",
+        modoEdicao
+      );
+
+      botaoEditar.textContent =
+        modoEdicao
+          ? "Encerrar edição manual"
+          : "Ativar edição manual";
+
+      cancelarSelecao();
+
+      mensagemEdicao(
+        modoEdicao
+          ? "Clique na primeira aula e depois " +
+            "na segunda aula da MESMA turma."
+          : "Edição encerrada."
+      );
+    }
+  );
+
+  botaoCancelar.addEventListener(
+    "click",
+    () => {
+      cancelarSelecao();
+
+      mensagemEdicao(
+        "Seleção cancelada. Escolha duas aulas."
+      );
+    }
+  );
+
+  // ==========================================
+  // TROCAR DUAS AULAS
+  // ==========================================
+
+  $("v2-resultado-grade")
+    .addEventListener(
+      "click",
+      evento => {
+        if (!modoEdicao) return;
+
+        const td = evento.target.closest(
+          "td[data-v2-chave]"
+        );
+
+        if (!td) return;
+
+        const chave =
+          td.dataset.v2Chave;
+
+        const salva = ler(
+          CHAVE,
+          null
+        );
+
+        if (
+          !salva?.dados ||
+          !salva?.grade
+        ) {
+          mensagemEdicao(
+            "Gere uma grade V2 primeiro.",
+            true
+          );
+          return;
+        }
+
+        // PRIMEIRA AULA
+
+        if (!primeiraChave) {
+          primeiraChave = chave;
+
+          td.classList.add(
+            "gm-v2-selecionada"
+          );
+
+          botaoCancelar.disabled = false;
+
+          mensagemEdicao(
+            "Primeira aula selecionada. " +
+            "Clique na segunda aula da mesma turma."
+          );
+
+          return;
+        }
+
+        // CANCELAR SELEÇÃO
+
+        if (
+          primeiraChave === chave
+        ) {
+          cancelarSelecao();
+
+          mensagemEdicao(
+            "Seleção cancelada."
+          );
+
+          return;
+        }
+
+        // IMPEDIR TROCA ENTRE TURMAS
+
+        if (
+          primeiraChave.split("|")[0] !==
+          chave.split("|")[0]
+        ) {
+          mensagemEdicao(
+            "Escolha duas aulas da mesma turma.",
+            true
+          );
+
+          return;
+        }
+
+        try {
+          configuracaoIntacta(
+            salva.dados
+          );
+
+          const proposta = {
+            ...salva.grade
+          };
+
+          // Troca apenas a posição das aulas.
+          // Professores compartilhados seguem juntos.
+
+          [
+            proposta[primeiraChave],
+            proposta[chave]
+          ] = [
+            proposta[chave],
+            proposta[primeiraChave]
+          ];
+
+          // Não salva se causar conflito.
+          validarTroca(
+            proposta,
+            salva.dados
+          );
+
+          ultimaGrade = JSON.parse(
+            JSON.stringify(salva.grade)
+          );
+
+          salva.grade = proposta;
+          salva.editadoEm =
+            new Date().toISOString();
+
+          localStorage.setItem(
+            CHAVE,
+            JSON.stringify(salva)
+          );
+
+          renderizar(
+            salva.dados,
+            salva.grade,
+            salva.geradaEm
+          );
+
+          cancelarSelecao();
+
+          botaoDesfazer.disabled = false;
+
+          mensagemEdicao(
+            "Troca realizada e salva! " +
+            "A impressão já utilizará o novo horário."
+          );
+
+        } catch (erro) {
+          mensagemEdicao(
+            `Troca não permitida: ${erro.message}`,
+            true
+          );
+        }
+      }
+    );
+
+  // ==========================================
+  // DESFAZER ÚLTIMA TROCA
+  // ==========================================
+
+  botaoDesfazer.addEventListener(
+    "click",
+    () => {
+      if (!ultimaGrade) return;
+
+      try {
+        const salva = ler(
+          CHAVE,
+          null
+        );
+
+        configuracaoIntacta(
+          salva.dados
+        );
+
+        validarTroca(
+          ultimaGrade,
+          salva.dados
+        );
+
+        salva.grade = ultimaGrade;
+
+        salva.editadoEm =
+          new Date().toISOString();
+
+        localStorage.setItem(
+          CHAVE,
+          JSON.stringify(salva)
+        );
+
+        ultimaGrade = null;
+
+        renderizar(
+          salva.dados,
+          salva.grade,
+          salva.geradaEm
+        );
+
+        cancelarSelecao();
+
+        botaoDesfazer.disabled = true;
+
+        mensagemEdicao(
+          "Última troca desfeita."
+        );
+
+      } catch (erro) {
+        mensagemEdicao(
+          `Não foi possível desfazer: ${erro.message}`,
+          true
+        );
+      }
+    }
+  );
 
   // ==========================================
   // RECUPERAR GRADE V2 SALVA
